@@ -21,42 +21,10 @@ if __name__ == '__main__':
         #     # print(line)
         #     sleep(sleepTime)
     
-        # angle = input("Enter new angle 1: ")
-        # ser.write(bytes(str(angle) + "\n", 'utf-8'))
+        angle = input("Enter new angle 1: ")
+        ser.write(bytes(str(angle) + "\n", 'utf-8'))
 
-        # height = math.cos(math.radians(float(angle))) * 50.0
+        height = math.cos(math.radians(float(angle))) * 50.0
 
-        # print(f"Height: {height}")
-
-        sleepTime = 3.0
-        while sleepTime > 0:
-
-            ser.write(bytes(str(90) + "\n", 'utf-8'))
-            sleep(0.0001)
-            ser.write(bytes(str(45) + "\n", 'utf-8'))
-            sleep(0.0001)
-            ser.write(bytes(str(0) + "\n", 'utf-8'))
-            sleep(sleepTime)
-
-            ser.write(bytes(str(45) + "\n", 'utf-8'))
-            sleep(0.0001)
-            ser.write(bytes(str(0) + "\n", 'utf-8'))
-            sleep(0.0001)
-            ser.write(bytes(str(45) + "\n", 'utf-8'))
-            sleep(sleepTime)
-
-            ser.write(bytes(str(0) + "\n", 'utf-8'))
-            sleep(0.0001)
-            ser.write(bytes(str(45) + "\n", 'utf-8'))
-            sleep(0.0001)
-            ser.write(bytes(str(90) + "\n", 'utf-8'))
-            sleep(sleepTime)
-
-            ser.write(bytes(str(45) + "\n", 'utf-8'))
-            sleep(0.0001)
-            ser.write(bytes(str(90) + "\n", 'utf-8'))
-            sleep(0.0001)
-            ser.write(bytes(str(45) + "\n", 'utf-8'))
-            sleep(sleepTime)
-
-            sleepTime -= 0.1
+        print(f"Height: {height}")
+        
