@@ -19,31 +19,33 @@ class PID_Controller:
         self.out = []
         self.errors = []
         self.poss = []
-        self.testSize=100
+        self.iErrors = []
         ###
 
     def getAction(self, pos, setpoint):
         error = sum([a * b for a, b in zip(setpoint, self.angleVector)]) - sum([a * b for a, b in zip(pos, self.angleVector)])
         self.iError += error
+        self.iErrors.append(self.iError * self.ki)
         action = self.kp * error + self.ki * self.iError + self.kd * ((error - self.prevError))# / (time() - prevTime)) time interval too short, causes div by 0 error
         action = max(action, -45.0) # Clip to
         action = min(action, 45.0) # servo range
         self.prevTime = time()
         self.prevError = error
 
-        self.errors.append(error)
+        self.errors.append(error/10.0)
         self.out.append(action)
-        self.poss.append(sum([a * b for a, b in zip(pos, self.angleVector)]))
+        self.poss.append(sum([a * b for a, b in zip(pos, self.angleVector)])/10.0)
 
         return action
 
     ### DEBUG
     def graph(self):
         plt.figure()
-        plt.plot(range(0,self.testSize), self.out, label='action')
-        plt.plot(range(0,self.testSize), self.errors, label='error')
-        plt.plot(range(0,self.testSize), self.poss, label='position')
-        plt.plot(range(0,self.testSize), [0]*self.testSize, label='0')
+        plt.plot(range(0,len(self.out)), self.out, label='action')
+        plt.plot(range(0,len(self.out)), self.errors, label='error/10.0')
+        plt.plot(range(0,len(self.out)), self.poss, label='position/10.0')
+        plt.plot(range(0,len(self.out)), self.iErrors, label='i error * ki')
+        plt.plot(range(0,len(self.out)), [0]*len(self.out), label='0')
         plt.legend()
         # plt.show()
     ###
