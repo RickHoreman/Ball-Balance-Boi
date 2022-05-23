@@ -9,7 +9,7 @@ int i = 0;
 
 // Main code
 void setup(){
-  Serial.begin(57600);
+  Serial.begin(9600);
   servo0.attach(9);
   servo1.attach(8);
   servo2.attach(7);
@@ -29,8 +29,8 @@ void loop(){
     i++;
     i = i%3;
     
-//    Serial.print("You sent me: ");
-//    Serial.println(pos);
+    Serial.print("You sent me: ");
+    Serial.println(pos);
   }
 //  for (pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
 //    // in steps of 1 degree

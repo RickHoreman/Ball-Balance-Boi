@@ -2,9 +2,16 @@ from time import sleep
 import serial
 import math
 
+ser = serial.Serial('COM3', 9600, timeout=1)
+ser.reset_input_buffer()
+
+def setAngle(angle):
+    ser.write(bytes(str(angle) + "\n", 'utf-8'))
+    line = ser.readline().decode('utf-8').rstrip()
+    print(line)
+    # sleep(0.0000001)
+
 if __name__ == '__main__':
-    ser = serial.Serial('COM4', 57600, timeout=1)
-    ser.reset_input_buffer()
     
     sleepTime = 1
     
@@ -23,6 +30,9 @@ if __name__ == '__main__':
     
         angle = input("Enter new angle 1: ")
         ser.write(bytes(str(angle) + "\n", 'utf-8'))
+
+        line = ser.readline().decode('utf-8').rstrip()
+        print(line)
 
         height = math.cos(math.radians(float(angle))) * 50.0
 

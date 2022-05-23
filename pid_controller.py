@@ -27,7 +27,7 @@ class PID_Controller:
         self.iError += error
         self.iErrors.append(self.iError * self.ki)
         action = self.kp * error + self.ki * self.iError + self.kd * ((error - self.prevError))# / (time() - prevTime)) time interval too short, causes div by 0 error
-        action = max(action, -45.0) # Clip to
+        action = max(action, -10.0) # Clip to
         action = min(action, 45.0) # servo range
         self.prevTime = time()
         self.prevError = error

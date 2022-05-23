@@ -1,4 +1,5 @@
 from pid_controller import PID_Controller
+import serial_controller as sc
 import math
 from operator import add
 from matplotlib import pyplot as plt
@@ -51,12 +52,16 @@ for i in range(0,simLength):
     x.append(pos[0])
     y.append(pos[1])
 
-    print(f"roll: {roll}, pitch: {pitch}, pos: {pos}")
+    #print(f"roll: {roll}, pitch: {pitch}, pos: {pos}")
     ###
 
     servoTopAct = servoTop.getAction(pos, setpoint)
     servoLeftAct = servoLeft.getAction(pos, setpoint)
     servoRightAct = servoRight.getAction(pos, setpoint)
+
+    sc.setAngle(servoTopAct + 45.0)
+    sc.setAngle(servoLeftAct + 45.0)
+    sc.setAngle(servoRightAct + 45.0)
 
 servoTop.graph()
 servoLeft.graph()
