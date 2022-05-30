@@ -2,7 +2,7 @@ from time import sleep
 import serial
 import math
 
-ser = serial.Serial('COM3', 9600, timeout=1)
+ser = serial.Serial('COM3', 115200, timeout=1)
 ser.reset_input_buffer()
 
 def setAngle(angle):

@@ -9,7 +9,7 @@ int i = 0;
 
 // Main code
 void setup(){
-  Serial.begin(9600);
+  Serial.begin(115200);
   servo0.attach(9);
   servo1.attach(8);
   servo2.attach(7);
