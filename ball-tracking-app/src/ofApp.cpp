@@ -29,12 +29,10 @@
 
 #define MINTRACKAREA 50
 
-using namespace cv;
-
-auto ofApp::trackball(std::uint8_t* frameptr) -> void {
+auto ofApp::trackball() -> void {
 
     // cv::Mat my_mat(rows, cols, CV_8UC1, &buf[0]); //in case of BGR image use CV_8UC3
-    Mat frame{camcfg.frame.height, camcfg.frame.width, CV_8UC3, frameptr};
+    
     // Mat frame{camcfg.frame.width, camcfg.frame.height, CV_8UC1, frameptr};
 
     //Resize large images to reduce processing load
@@ -44,41 +42,67 @@ auto ofApp::trackball(std::uint8_t* frameptr) -> void {
 
     //Convert RGB to HSV colormap
     //and apply Gaussain blur
-    Mat hsvFrame;
-    cvtColor(frame, hsvFrame, CV_RGB2HSV);
+    //Mat hsvFrame;
+    //cvtColor(frame, hsvFrame, CV_RGB2HSV);
     // cvtColor(frame, hsvFrame, CV_BGR2HSV);
 
-    blur(hsvFrame, hsvFrame, cv::Size(1, 1));
+    //blur(hsvFrame, hsvFrame, cv::Size(1, 1));
 
     //Threshold 
     // Scalar lowerBound = cv::Scalar(55, 100, 50);
     // Scalar upperBound = cv::Scalar(90, 255, 255);
-    Scalar lowerBound = cv::Scalar(0, 100, 50);
-    Scalar upperBound = cv::Scalar(50, 255, 255);
-    Mat threshFrame;
-    inRange(hsvFrame, lowerBound, upperBound, threshFrame);
+    //Scalar lowerBound = cv::Scalar(0, 100, 50);
+    //Scalar upperBound = cv::Scalar(50, 255, 255);
+    //Mat threshFrame;
+    //inRange(hsvFrame, lowerBound, upperBound, threshFrame);
 
     //Calculate X,Y centroid
-    Moments m = moments(threshFrame, false);
-    Point com(m.m10 / m.m00, m.m01 / m.m00);
+
+    //Moments m = moments(threshFrame, false);
+    //Point com(m.m10 / m.m00, m.m01 / m.m00);
+
+    //Hough method
+    //cv::Mat gray = frame;
+    //cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+    //medianBlur(frame, frame, 5);
+
+    //cv::equalizeHist(frame, frame);
+    //cv::GaussianBlur(frame, frame, cv::Size(5, 5), 0);
+
+    vector<cv::Vec3f> circles;
+    HoughCircles(frame, circles, cv::HOUGH_GRADIENT, 1,
+        frame.rows / 16,  // change this value to detect circles with different distances to each other
+        200, 20, 20, 75 // change the last two parameters
+   // (min_radius & max_radius) to detect larger circles
+    );
+
+    for (size_t i = 0; i < circles.size(); i++)
+    {
+        cv::Vec3i c = circles[i];
+        cv::Point center = cv::Point(c[0], c[1]);
+        // circle center
+        circle(frame, center, 1, cv::Scalar(0, 100, 100), 3, cv::LINE_AA);
+        // circle outline
+        int radius = c[2];
+        circle(frame, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
+    }
 
     //Draw crosshair
-    Scalar color = cv::Scalar(0, 0, 255);
-    drawMarker(frame, com, color, cv::MARKER_CROSS, 50, 5);
+    //Scalar color = cv::Scalar(0, 0, 255);
+    //drawMarker(frame, com, color, cv::MARKER_CROSS, 50, 5);
 
     // imshow("Tennis Ball", frame);
     // imshow("Thresholded Tennis Ball", threshFrame);
     // ofxCv::toOf(frame, colorimg);
-    ofxCv::drawMat(frame, 0, 0);
     // ofxCv::drawMat(threshFrame, 600, 400);
 
-    string str = "pos: ";
-    str += ofToString(com.x, 2);
-    str += ", ";
-    str += ofToString(com.y, 2);
-    ofDrawBitmapString(str, 10, 50);
+    //string str = "pos: ";
+    //str += ofToString(com.x, 2);
+    //str += ", ";
+    //str += ofToString(com.y, 2);
+    //ofDrawBitmapString(str, 10, 50);
 
-    std::cout << com.x << ' ' << com.y << std::endl;
+    //std::cout << com.x << ' ' << com.y << std::endl;
 
     // return threshFrame;
 };
@@ -105,7 +129,7 @@ auto ofApp::allocframebuffers() -> void {
     // grayimg.allocate(camcfg.frame.width, camcfg.frame.height);
     // bgimg.allocate(camcfg.frame.width, camcfg.frame.height);
     // diffimg.allocate(camcfg.frame.width, camcfg.frame.height);
-    camframe = std::make_unique_for_overwrite<std::uint8_t[]>(camcfg.frame.size(3));
+    camframe = std::make_unique_for_overwrite<std::uint8_t[]>(camcfg.frame.size());
 }
 
 //char key
@@ -136,6 +160,8 @@ auto ofApp::update() -> void {
     if (not camera) return;
 
 	camera->getFrame(camframe.get());
+    frame.data = camframe.get();
+    trackball();
 
     // colorimg.setFromPixels(camframe.get(), camcfg.frame.width, camcfg.frame.height);
     // trackball(camframe.get());
@@ -160,38 +186,38 @@ auto ofApp::draw() -> void {
     // diffimg.draw(camcfg.frame.width, 0);
 
     // drawblobs();
-    trackball(camframe.get());
+    ofxCv::drawMat(frame, 0, 0, GL_R8);
     
     string str = "app fps: ";
 	str += ofToString(ofGetFrameRate(), 2);
     str += "\ncamera fps: " + ofToString(camstats.fps(), 2);
     ofDrawBitmapString(str, 10, 15);
 
-    stringstream reportStr;
-    reportStr << "bg subtraction and blob detection" << endl
-        << "press ' ' to capture bg" << endl
-        << "threshold " << threshold << " (press: +/-)" << endl
-        << "num blobs found " << finder.nBlobs << ", fps: " << ofGetFrameRate();
-    ofDrawBitmapString(reportStr.str(), 1300, 200);
+    //stringstream reportStr;
+    //reportStr << "bg subtraction and blob detection" << endl
+    //    << "press ' ' to capture bg" << endl
+    //    << "threshold " << threshold << " (press: +/-)" << endl
+    //    << "num blobs found " << finder.nBlobs << ", fps: " << ofGetFrameRate();
+    //ofDrawBitmapString(reportStr.str(), 1300, 200);
 }
 
 /**
  * @copydoc ofApp::drawblobs
  * @internal ..
  */
-auto ofApp::drawblobs() -> void {
-    for (int i = 0; i < finder.nBlobs; i++) {
-        finder.blobs[i].draw(camcfg.frame.width, camcfg.frame.height);
-
-        // draw over the centroid if the blob is a hole
-        ofSetColor(255);
-        if (finder.blobs[i].hole) {
-            ofDrawBitmapString("hole",
-                finder.blobs[i].boundingRect.getCenter().x + 360,
-                finder.blobs[i].boundingRect.getCenter().y + 540);
-        }
-    }
-}
+//auto ofApp::drawblobs() -> void {
+//    for (int i = 0; i < finder.nBlobs; i++) {
+//        finder.blobs[i].draw(camcfg.frame.width, camcfg.frame.height);
+//
+//        // draw over the centroid if the blob is a hole
+//        ofSetColor(255);
+//        if (finder.blobs[i].hole) {
+//            ofDrawBitmapString("hole",
+//                finder.blobs[i].boundingRect.getCenter().x + 360,
+//                finder.blobs[i].boundingRect.getCenter().y + 540);
+//        }
+//    }
+//}
 
 
 

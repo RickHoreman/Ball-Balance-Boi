@@ -55,13 +55,14 @@ public:
 private:
 	auto allocframebuffers() -> void;
 	auto setbackground() -> void;
-	auto drawblobs() -> void;
-	auto trackball(std::uint8_t* frameptr) -> void;
+	//auto drawblobs() -> void;
+	auto trackball() -> void;
 
     cam::devptr camera;
 	cam::framestats camstats;
 	cam::config camcfg{cam::config::defaults()};
 	std::unique_ptr<std::uint8_t[]> camframe;
+	cv::Mat frame{ camcfg.frame.height, camcfg.frame.width, CV_8UC1 };
 
 	ofxCvColorImage colorimg;
 	//
