@@ -10,78 +10,20 @@
  * @details ..
  */
 
-// #define OF_USING_STD_FS 1
 #include "ofApp.h"
 #include "ps3eye.h"
 #include "camera.h"
-// #include "memory.h"
 
+#include <ofxCv.h>
+#include <opencv.hpp>
+#include <tracking.hpp> // needed?
+
+#include <cctype>
+#include <charconv>
 #include <exception>
+#include <format>
 #include <iostream>
 #include <memory>
-
-#include "ofxCv.h"
-
-#include <opencv.hpp>
-#include <tracking.hpp> // ?
-
-
-
-#define MINTRACKAREA 50
-
-using namespace cv;
-
-auto ofApp::trackball(std::uint8_t* frameptr) -> void {
-
-    // cv::Mat my_mat(rows, cols, CV_8UC1, &buf[0]); //in case of BGR image use CV_8UC3
-    Mat frame{camcfg.frame.height, camcfg.frame.width, CV_8UC3, frameptr};
-    // Mat frame{camcfg.frame.width, camcfg.frame.height, CV_8UC1, frameptr};
-
-    //Resize large images to reduce processing load
-    // cap >> frame;
-
-
-
-    //Convert RGB to HSV colormap
-    //and apply Gaussain blur
-    Mat hsvFrame;
-    cvtColor(frame, hsvFrame, CV_RGB2HSV);
-    // cvtColor(frame, hsvFrame, CV_BGR2HSV);
-
-    blur(hsvFrame, hsvFrame, cv::Size(1, 1));
-
-    //Threshold 
-    // Scalar lowerBound = cv::Scalar(55, 100, 50);
-    // Scalar upperBound = cv::Scalar(90, 255, 255);
-    Scalar lowerBound = cv::Scalar(0, 100, 50);
-    Scalar upperBound = cv::Scalar(50, 255, 255);
-    Mat threshFrame;
-    inRange(hsvFrame, lowerBound, upperBound, threshFrame);
-
-    //Calculate X,Y centroid
-    Moments m = moments(threshFrame, false);
-    Point com(m.m10 / m.m00, m.m01 / m.m00);
-
-    //Draw crosshair
-    Scalar color = cv::Scalar(0, 0, 255);
-    drawMarker(frame, com, color, cv::MARKER_CROSS, 50, 5);
-
-    // imshow("Tennis Ball", frame);
-    // imshow("Thresholded Tennis Ball", threshFrame);
-    // ofxCv::toOf(frame, colorimg);
-    ofxCv::drawMat(frame, 0, 0);
-    // ofxCv::drawMat(threshFrame, 600, 400);
-
-    string str = "pos: ";
-    str += ofToString(com.x, 2);
-    str += ", ";
-    str += ofToString(com.y, 2);
-    ofDrawBitmapString(str, 10, 50);
-
-    std::cout << com.x << ' ' << com.y << std::endl;
-
-    // return threshFrame;
-};
 
 /**
  * @copydoc ofApp::setup
@@ -94,28 +36,71 @@ auto ofApp::setup() -> void {
     if (cam::initcamera(*camera, camcfg) != cam::status::operational) {
         throw std::runtime_error("could not initialize ps3 camera");
     }
-    allocframebuffers();
-}
-
-/**
- * @copydoc ofApp::allocframebuffers
- * @internal ..
- */
-auto ofApp::allocframebuffers() -> void {
-    // grayimg.allocate(camcfg.frame.width, camcfg.frame.height);
-    // bgimg.allocate(camcfg.frame.width, camcfg.frame.height);
-    // diffimg.allocate(camcfg.frame.width, camcfg.frame.height);
     camframe = std::make_unique_for_overwrite<std::uint8_t[]>(camcfg.frame.size(3));
+    initmenu();
+    ofSetFrameRate(80);
 }
 
-//char key
-//camcfg& 
-//
-//b - brightness: 678
-//c - contrast:   456
-//s - sharpness:  789
-//
-//new value: 
+auto ofApp::initmenu() noexcept -> void {
+    inputmenu.add('s', "sharpness",
+        +[](cam::ps3cam const& camera)
+        { return camera.getSharpness(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setSharpness(value); });
+    inputmenu.add('e', "exposure",
+        +[](cam::ps3cam const& camera)
+        { return camera.getExposure(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setExposure(value); });
+    inputmenu.add('b', "brightness",
+        +[](cam::ps3cam const& camera)
+        { return camera.getBrightness(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setBrightness(value); });
+    inputmenu.add('c', "contrast",
+        +[](cam::ps3cam const& camera)
+        { return camera.getContrast(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setContrast(value); });
+
+    inputmenu.add('g', "gain",
+        +[](cam::ps3cam const& camera)
+        { return camera.getGain(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setGain(value); });
+    inputmenu.add('h', "hue",
+        +[](cam::ps3cam const& camera)
+        { return camera.getHue(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setHue(value); });
+
+    inputmenu.add('d', "red balance",
+        +[](cam::ps3cam const& camera)
+        { return camera.getRedBalance(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setRedBalance(value); });
+    inputmenu.add('n', "green balance",
+        +[](cam::ps3cam const& camera)
+        { return camera.getGreenBalance(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setGreenBalance(value); });
+    inputmenu.add('u', "blue balance",
+        +[](cam::ps3cam const& camera)
+        { return camera.getBlueBalance(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setBlueBalance(value); });
+
+    inputmenu.add('w', "auto white bal.",
+        +[](cam::ps3cam const& camera) -> std::uint8_t
+        { return camera.getAutoWhiteBalance(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setAutoWhiteBalance(value); });
+    inputmenu.add('a', "auto gain",
+        +[](cam::ps3cam const& camera) -> std::uint8_t
+        { return camera.getAutogain(); },
+        +[](cam::ps3cam& camera, std::uint8_t value)
+        { camera.setAutogain(value); });
+}
 
 /**
  * @copydoc ofApp::exit
@@ -136,16 +121,51 @@ auto ofApp::update() -> void {
     if (not camera) return;
 
 	camera->getFrame(camframe.get());
+    trackball();
+    // camstats.update();
+}
 
-    // colorimg.setFromPixels(camframe.get(), camcfg.frame.width, camcfg.frame.height);
-    // trackball(camframe.get());
+/**
+ * @copydoc ofApp::trackball
+ * @internal ..
+ */
+auto ofApp::trackball() -> void {
+    // cv::Mat frame{camcfg.frame.height, camcfg.frame.width, CV_8UC1, camframe.get()};
+    cv::Mat frame{camcfg.frame.width, camcfg.frame.height, CV_8UC3, camframe.get()};
 
-    // grayimg.setFromPixels(camframe.get(), camcfg.frame.width, camcfg.frame.height);
-    // grayimg = colorimg;
-    //diffimg.absDiff(bgimg, grayimg);
-    //diffimg.threshold(threshold);
-    //finder.findContours(diffimg, 20, camcfg.frame.size() / 3, 10, true);
-    //camstats.update();
+    // Resize large images to reduce processing load
+    // cap >> frame;
+
+    // Convert RGB to HSV colormap and apply Gaussain blur
+    cv::Mat hsvFrame;
+    cv::cvtColor(frame, hsvFrame, CV_RGB2HSV);
+    // cv::cvtColor(frame, hsvFrame, CV_BGR2HSV);
+
+    cv::blur(hsvFrame, hsvFrame, cv::Size(1, 1));
+
+    // Threshold 
+    // Scalar lowerBound = cv::Scalar(55, 100, 50);
+    // Scalar upperBound = cv::Scalar(90, 255, 255);
+    cv::Scalar lowerBound = cv::Scalar(0, 100, 50);
+    cv::Scalar upperBound = cv::Scalar(50, 255, 255);
+    cv::Mat threshFrame;
+    cv::inRange(hsvFrame, lowerBound, upperBound, threshFrame);
+
+    // Calculate X,Y centroid
+    cv::Moments m = moments(threshFrame, false);
+    cv::Point com(m.m10 / m.m00, m.m01 / m.m00);
+
+    // Draw crosshair
+    cv::Scalar color = cv::Scalar(0, 0, 255);
+    cv::drawMarker(frame, com, color, cv::MARKER_CROSS, 50, 5);
+    // ofxCv::toOf(frame, colorimg);
+    ofxCv::drawMat(frame, 0, 0);
+    // ofxCv::drawMat(threshFrame, 600, 400);
+
+    ofDrawBitmapString(std::format(
+        "ball pos: {}, {}", com.x, com.y), 10, 50);
+
+    std::cout << com.x << ' ' << com.y << std::endl;
 }
 
 /**
@@ -154,68 +174,138 @@ auto ofApp::update() -> void {
  */
 auto ofApp::draw() -> void {
     ofSetHexColor(0xffffff);
-
-    // grayimg.draw(0, 0);
-    // bgimg.draw(0, camcfg.frame.height);
-    // diffimg.draw(camcfg.frame.width, 0);
-
-    // drawblobs();
-    trackball(camframe.get());
-    
-    string str = "app fps: ";
-	str += ofToString(ofGetFrameRate(), 2);
-    str += "\ncamera fps: " + ofToString(camstats.fps(), 2);
-    ofDrawBitmapString(str, 10, 15);
-
-    stringstream reportStr;
-    reportStr << "bg subtraction and blob detection" << endl
-        << "press ' ' to capture bg" << endl
-        << "threshold " << threshold << " (press: +/-)" << endl
-        << "num blobs found " << finder.nBlobs << ", fps: " << ofGetFrameRate();
-    ofDrawBitmapString(reportStr.str(), 1300, 200);
+    drawfps(10, 15);
+    drawmenu(10, 150);
 }
 
 /**
- * @copydoc ofApp::drawblobs
+ * @copydoc ofApp::drawfps
  * @internal ..
  */
-auto ofApp::drawblobs() -> void {
-    for (int i = 0; i < finder.nBlobs; i++) {
-        finder.blobs[i].draw(camcfg.frame.width, camcfg.frame.height);
-
-        // draw over the centroid if the blob is a hole
-        ofSetColor(255);
-        if (finder.blobs[i].hole) {
-            ofDrawBitmapString("hole",
-                finder.blobs[i].boundingRect.getCenter().x + 360,
-                finder.blobs[i].boundingRect.getCenter().y + 540);
-        }
-    }
+auto ofApp::drawfps(float x, float y) const -> void {
+    ofDrawBitmapString(std::format(
+        "app fps: {:.2f}\ncam fps: {:.2f}",
+        ofGetFrameRate(), camstats.fps()), x, y);
 }
 
-
+/**
+ * @copydoc ofApp::drawmenu
+ * @internal ..
+ */
+auto ofApp::drawmenu(float x, float y) const -> void {
+    ofDrawBitmapString(std::format("{}\n{}{}",
+        menuprompt, inputprompt, inputvalue), x, y);
+}
 
 /**
  * @copydoc ofApp::keyPressed
  * @internal ..
  */
 auto ofApp::keyPressed(int key) -> void {
-    auto const update_threshold{
-        [&](int inc, int limit)
-        { threshold += threshold == limit ? 0 : inc; }};
-    switch (key) {
-    break; case ' ': setbackground();
-    break; case '+': update_threshold(1, 255);
-    break; case '-': update_threshold(-1, 0);
+    switch (inputmode) {
+    case keyinput::app:   return handle_app_input(key);
+    case keyinput::menu:  return handle_menu_input(key);
+    case keyinput::value: return handle_input_value(key);
     }
 }
 
 /**
- * @copydoc ofApp::setbackground
+ * @copydoc ofApp::handle_app_input
  * @internal ..
  */
-auto ofApp::setbackground() -> void
-{ bgimg = grayimg; }
+auto ofApp::handle_app_input(int key) noexcept -> void {
+    switch (key) {
+    case OF_KEY_TAB: return show_menu();
+    default:         return;
+    }
+}
+
+/**
+ * @copydoc ofApp::show_menu
+ * @internal ..
+ */
+auto ofApp::show_menu() noexcept -> void {
+    menuprompt = inputmenu.to_string(*camera);
+    inputmode = keyinput::menu;
+}
+
+/**
+ * @copydoc ofApp::handle_menu_input
+ * @internal ..
+ */
+auto ofApp::handle_menu_input(int key) noexcept -> void {
+    switch (key) {
+    case OF_KEY_TAB: return exit_menu();
+    default:         return select_option(key);
+    }
+}
+
+/**
+ * @copydoc ofApp::exit_menu
+ * @internal ..
+ */
+auto ofApp::exit_menu() noexcept -> void {
+    menuprompt.clear();
+    inputmode = keyinput::app;
+}
+
+/**
+ * @copydoc ofApp::exit_menu
+ * @internal ..
+ */
+auto ofApp::select_option(int key) noexcept -> void {
+    if (not inputmenu.contains(key)) return;
+    inputmenu.select(key);
+    inputprompt = "new value: ";
+    inputmode = keyinput::value;
+}
+
+/**
+ * @copydoc ofApp::handle_input_value
+ * @internal ..
+ */
+auto ofApp::handle_input_value(int key) -> void {
+    switch (key) {
+    case OF_KEY_RETURN:    return apply_input_value();
+    case OF_KEY_BACKSPACE: return erase_input_value();
+    default:               return add_input_value(key);
+    }
+}
+
+/**
+ * @copydoc ofApp::apply_input_value
+ * @internal ..
+ */
+auto ofApp::apply_input_value() -> void {
+    if (inputvalue.empty()) return;
+
+    auto result = std::uint8_t{255};
+    auto const status = std::from_chars(inputvalue.data(),
+        inputvalue.data() + inputvalue.size(), result);
+    inputmenu.selection().setvalue(*camera, result);
+    menuprompt = inputmenu.to_string(*camera);
+    inputprompt.clear();
+    inputvalue.clear();
+    inputmode = keyinput::menu;
+}
+
+/**
+ * @copydoc ofApp::erase_input_value
+ * @internal ..
+ */
+auto ofApp::erase_input_value() noexcept -> void {
+    if (inputvalue.empty()) return;
+    inputvalue.pop_back();
+}
+
+/**
+ * @copydoc ofApp::add_input_value
+ * @internal ..
+ */
+auto ofApp::add_input_value(unsigned char key) noexcept -> void {
+    if (not std::isdigit(key)) return;
+    inputvalue += key;
+}
 
 auto ofApp::keyReleased(int key) -> void{}
 auto ofApp::mouseMoved(int x, int y ) -> void {}

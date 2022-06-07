@@ -61,11 +61,6 @@ class framestats {
 public:
     /**
      * @brief ..
-     */
-    framestats() = default;
-
-    /**
-     * @brief ..
      * @details ..
      */
     auto update() -> void;
@@ -81,7 +76,7 @@ public:
     /**
      * @brief ..
      */
-    friend auto operator<=>(framestats const&, framestats const&) = default;
+    friend auto operator==(framestats const&, framestats const&) -> bool = default;
 
 private:
     std::uint64_t sampletime{};   /**< .. */
@@ -119,7 +114,7 @@ struct frame {
     /**
      * @brief ..
      */
-    friend auto operator<=>(frame const&, frame const&) = default;
+    friend auto operator==(frame const&, frame const&) -> bool = default;
 
     std::uint16_t width;   /**< .. */
     std::uint16_t height;  /**< .. */
@@ -135,7 +130,7 @@ struct balance {
     /**
      * @brief ..
      */
-    friend auto operator<=>(balance const&, balance const&) = default;
+    friend auto operator==(balance const&, balance const&) -> bool = default;
 
     std::uint8_t red;    /**< .. */
     std::uint8_t green;  /**< .. */
@@ -156,15 +151,15 @@ struct config {
      */
     static constexpr auto defaults() noexcept -> config {
         return {
-            .format{cfg::format::RGB},
+            .format{cfg::format::Gray},
             .frame{.width{640},.height{480},.rate{60}},
             .balance{.red{128},.green{128},.blue{128},.autowhite{false}},
-            .sharpness{0},
             .exposure{30},
-            .brightness{150},
+            .sharpness{0},
             .contrast{150},
-            .gain{20},
+            .brightness{150},
             .hue{143},
+            .gain{20},
             .autogain{false}
         };
     }
@@ -172,17 +167,17 @@ struct config {
     /**
      * @brief ..
      */
-    friend auto operator<=>(config const&, config const&) = default;
+    friend auto operator==(config const&, config const&) -> bool = default;
 
     cfg::format format;       /**< .. */
     cfg::frame frame;         /**< .. ? */
     cfg::balance balance;     /**< .. ? */
-    std::uint8_t sharpness;   /**< .. */
     std::uint8_t exposure;    /**< .. */
-    std::uint8_t brightness;  /**< .. */
+    std::uint8_t sharpness;   /**< .. */
     std::uint8_t contrast;    /**< .. */
-    std::uint8_t gain;        /**< .. */
+    std::uint8_t brightness;  /**< .. */
     std::uint8_t hue;         /**< .. */
+    std::uint8_t gain;        /**< .. */
     bool autogain;            /**< .. */
 };
 
