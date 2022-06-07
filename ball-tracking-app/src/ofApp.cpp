@@ -85,6 +85,7 @@ auto ofApp::trackball() -> void {
         // circle outline
         int radius = c[2];
         circle(frame, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
+        //std::cout << i << ": " << center.x << ";" << center.y << "\n";
     }
 
     //Draw crosshair
@@ -186,12 +187,27 @@ auto ofApp::draw() -> void {
     // diffimg.draw(camcfg.frame.width, 0);
 
     // drawblobs();
+
     ofxCv::drawMat(frame, 0, 0, GL_R8);
+
+    for (int i{ 0 }; i < debugLines.size(); i++) {
+        ofSetColor(debugLineColors[i]);
+        debugLines[i].draw();
+    }
+    ofSetColor({ 255,255,255 });
     
     string str = "app fps: ";
 	str += ofToString(ofGetFrameRate(), 2);
     str += "\ncamera fps: " + ofToString(camstats.fps(), 2);
     ofDrawBitmapString(str, 10, 15);
+
+    switch (state) {
+    case appState::calibration:
+        string str = "Please click calibration point ";
+        str += ofToString(pointsCalibrated + 1);
+        str += ".\n";
+        ofDrawBitmapString(str, 190, 200);
+    }
 
     //stringstream reportStr;
     //reportStr << "bg subtraction and blob detection" << endl
@@ -219,7 +235,41 @@ auto ofApp::draw() -> void {
 //    }
 //}
 
+auto ofApp::finishCalibration() -> void {
+    std::cout << "Finishing calibration.\n";
 
+    centerPoint = { (calibrationPoints[0].first + calibrationPoints[1].first + calibrationPoints[2].first) / 3, (calibrationPoints[0].second + calibrationPoints[1].second + calibrationPoints[2].second) / 3 };
+
+    for (int i{ 0 }; i < calibrationPoints.size(); i++) {
+        int j = i + 1;
+        if (j >= calibrationPoints.size()) {
+            j = 0;
+        }
+        ofPolyline line;
+        line.addVertex(ofPoint{ centerPoint.first, centerPoint.second });
+        line.addVertex(ofPoint{ calibrationPoints[i].first, calibrationPoints[i].second});
+        debugLines.push_back(line);
+        debugLineColors.push_back({ 0,0,150 });
+
+        ofPolyline line2;
+        line2.addVertex(ofPoint{ calibrationPoints[i].first, calibrationPoints[i].second });
+        line2.addVertex(ofPoint{ calibrationPoints[j].first, calibrationPoints[j].second });
+        debugLines.push_back(line2);
+        debugLineColors.push_back({ 0,200,0 });
+    }
+
+
+
+    state = appState::running;
+    std::cout << "Finished calibration.\n";
+}
+
+auto ofApp::reCalibrate() -> void {
+    state = appState::calibration;
+    debugLines.clear();
+    debugLineColors.clear();
+    pointsCalibrated = 0;
+}
 
 /**
  * @copydoc ofApp::keyPressed
@@ -233,6 +283,35 @@ auto ofApp::keyPressed(int key) -> void {
     break; case ' ': setbackground();
     break; case '+': update_threshold(1, 255);
     break; case '-': update_threshold(-1, 0);
+    break; case 'c': reCalibrate();
+    }
+}
+
+auto ofApp::mousePressed(int x, int y, int button) -> void {
+    switch (button) {
+    case 0:
+        switch (state) {
+        case appState::calibration:
+            calibrationPoints[pointsCalibrated] = { float(x), float(y) };
+            pointsCalibrated++;
+            std::cout << "Point: " << pointsCalibrated << " x: " << x << " y: " << y << "\n";
+            ofPolyline line;
+            line.addVertex(ofPoint{ 640 / 2, 480 / 2 });
+            line.addVertex(ofPoint{ float(x), float(y) });
+            debugLines.push_back(line);
+            debugLineColors.push_back({ 100, 0, 0 });
+            if(pointsCalibrated >= 3){
+                finishCalibration();
+            }
+            break;
+        }
+        break;
+    case 1:
+        //std::cout << "x: " << x << " y: " << y << " center\n";
+        break;
+    case 2:
+        //std::cout << "x: " << x << " y: " << y << " right\n";
+        break;
     }
 }
 
@@ -246,7 +325,7 @@ auto ofApp::setbackground() -> void
 auto ofApp::keyReleased(int key) -> void{}
 auto ofApp::mouseMoved(int x, int y ) -> void {}
 auto ofApp::mouseDragged(int x, int y, int button) -> void {}
-auto ofApp::mousePressed(int x, int y, int button) -> void {}
+//auto ofApp::mousePressed(int x, int y, int button) -> void {}
 auto ofApp::mouseReleased(int x, int y, int button) -> void {}
 auto ofApp::windowResized(int w, int h) -> void {}
 auto ofApp::gotMessage(ofMessage msg) -> void {}
