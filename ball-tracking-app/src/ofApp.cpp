@@ -19,6 +19,8 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 #include "ofxCv.h"
 
@@ -162,7 +164,12 @@ auto ofApp::update() -> void {
 
 	camera->getFrame(camframe.get());
     frame.data = camframe.get();
+
     trackball();
+
+    //genTransMatrix(0, { 255,255,0 });
+    //genTransMatrix(1, { 0,255,255 });
+    //genTransMatrix(2, { 255,0,255 });
 
     // colorimg.setFromPixels(camframe.get(), camcfg.frame.width, camcfg.frame.height);
     // trackball(camframe.get());
@@ -190,12 +197,10 @@ auto ofApp::draw() -> void {
 
     ofxCv::drawMat(frame, 0, 0, GL_R8);
 
-    for (int i{ 0 }; i < debugLines.size(); i++) {
-        ofSetColor(debugLineColors[i]);
-        debugLines[i].draw();
-    }
-    ofSetColor({ 255,255,255 });
-    
+
+    if (displayDebugVisualisation) { drawDebug(); }
+
+
     string str = "app fps: ";
 	str += ofToString(ofGetFrameRate(), 2);
     str += "\ncamera fps: " + ofToString(camstats.fps(), 2);
@@ -208,6 +213,7 @@ auto ofApp::draw() -> void {
         str += ".\n";
         ofDrawBitmapString(str, 190, 200);
     }
+    // //
 
     //stringstream reportStr;
     //reportStr << "bg subtraction and blob detection" << endl
@@ -217,28 +223,88 @@ auto ofApp::draw() -> void {
     //ofDrawBitmapString(reportStr.str(), 1300, 200);
 }
 
-/**
- * @copydoc ofApp::drawblobs
- * @internal ..
- */
-//auto ofApp::drawblobs() -> void {
-//    for (int i = 0; i < finder.nBlobs; i++) {
-//        finder.blobs[i].draw(camcfg.frame.width, camcfg.frame.height);
-//
-//        // draw over the centroid if the blob is a hole
-//        ofSetColor(255);
-//        if (finder.blobs[i].hole) {
-//            ofDrawBitmapString("hole",
-//                finder.blobs[i].boundingRect.getCenter().x + 360,
-//                finder.blobs[i].boundingRect.getCenter().y + 540);
-//        }
-//    }
-//}
+auto ofApp::drawDebug() -> void {
+    for (int i{ 0 }; i < debugLines.size(); i++) {
+        ofSetColor(debugLineColors[i]);
+        debugLines[i].draw();
+    }
+
+    if (state == appState::running) {
+        for (int i{ 0 }; i < transMatrices.size(); i++) {
+            ofPoint mousePos{ float(ofGetMouseX()), float(ofGetMouseY()) };
+
+            float result = (mousePos.x - centerPoint.x) * transMatrices[i].x + (mousePos.y - centerPoint.y) * transMatrices[i].y; // This should happen elsewhere (too) probably idunno
+
+            ofPoint v = calibrationPoints[i] - centerPoint;
+            float mV = std::sqrt(std::pow(v.x, 2) + std::pow(v.y, 2));
+            ofPoint resPos = (v / mV) * result;
+
+            ofPolyline resLine;
+            resLine.addVertices({ mousePos, resPos + centerPoint });
+            ofColor color;
+            switch (i) {
+            case 0: color = { 255,255,0 }; break;
+            case 1: color = { 0,255,255 }; break;
+            case 2: color = { 255,0,255 }; break;
+            }
+            ofSetColor(color);
+            resLine.draw();
+
+            //Scaled output shown as sliders:
+            float targetSideSize = 250; // Move target related calculations stuff elsewhere (only needs to happen once)
+            float targetHeight = std::sqrt(std::pow(targetSideSize, 2) - std::pow(targetSideSize / 2.f, 2));
+            std::array<ofPoint, 3> targetPoints{ ofPoint{targetSideSize / 2.f, 0.f}, ofPoint{0.f, targetHeight}, ofPoint{targetSideSize, targetHeight} };
+            ofPoint targetCenter{(targetPoints[0].x + targetPoints[1].x + targetPoints[2].x)/3.f, (targetPoints[0].y + targetPoints[1].y + targetPoints[2].y) / 3.f };
+            float targetScale = targetCenter.x;
+            float scaledRes = result / mV * targetScale;
+            
+            ofPoint displayPos{ 650.f, 50.f + 30.f*i };
+
+            ofPolyline scale;
+            scale.addVertices({ displayPos, displayPos + ofPoint{targetScale * 2.f, 0} });
+            ofPolyline pointer;
+            pointer.addVertices({ displayPos + ofPoint{scaledRes + targetScale, -5}, displayPos + ofPoint{scaledRes + targetScale, 5} });
+            ofPolyline center;
+            center.addVertices({ displayPos + ofPoint{targetScale, -3}, displayPos + ofPoint{targetScale, 3} });
+            scale.draw();
+            pointer.draw();
+            center.draw();
+
+            string str = std::format("{:.2f}", scaledRes );
+            ofDrawBitmapString(str, displayPos + ofPoint{ targetScale*2.f + 10, 0});
+
+            color.a = 128;
+            ofSetColor(color);
+            ofPolyline helper;
+            helper.addVertices({ resPos + centerPoint, centerPoint });
+            helper.draw();
+        }
+    }
+
+    ofSetColor({ 255,255,255 });
+}
+
+auto ofApp::genTransMatrix(int i) -> void {
+    //float scale = 200;
+    ofPoint vTrans{ 0, 1 };
+    ofPoint center = centerPoint;
+    ofPoint v = calibrationPoints[i] - center;
+
+    float mV = std::sqrt(std::pow(v.x, 2) + std::pow(v.y, 2));
+    //scale = mV;
+    vTrans = vTrans /*/ mPre*//* * (scale / mPre)*/;
+    float rTrans = std::atan((v.y) / (v.x)) - std::atan(vTrans.y / vTrans.x);
+    if (v.x < 0 or (v.x == 0 and v.y < 0)) {
+        rTrans += M_PI;
+    }
+    vTrans = { std::cos(rTrans) * vTrans.x - std::sin(rTrans) * vTrans.y, std::sin(rTrans) * vTrans.x + std::cos(rTrans) * vTrans.y };
+    transMatrices[i] = vTrans;
+};
 
 auto ofApp::finishCalibration() -> void {
     std::cout << "Finishing calibration.\n";
 
-    centerPoint = { (calibrationPoints[0].first + calibrationPoints[1].first + calibrationPoints[2].first) / 3, (calibrationPoints[0].second + calibrationPoints[1].second + calibrationPoints[2].second) / 3 };
+    centerPoint = { (calibrationPoints[0].x + calibrationPoints[1].x + calibrationPoints[2].x) / 3, (calibrationPoints[0].y + calibrationPoints[1].y + calibrationPoints[2].y) / 3 };
 
     for (int i{ 0 }; i < calibrationPoints.size(); i++) {
         int j = i + 1;
@@ -246,19 +312,24 @@ auto ofApp::finishCalibration() -> void {
             j = 0;
         }
         ofPolyline line;
-        line.addVertex(ofPoint{ centerPoint.first, centerPoint.second });
-        line.addVertex(ofPoint{ calibrationPoints[i].first, calibrationPoints[i].second});
+        line.addVertex(centerPoint);
+        line.addVertex(calibrationPoints[i]);
         debugLines.push_back(line);
         debugLineColors.push_back({ 0,0,150 });
 
         ofPolyline line2;
-        line2.addVertex(ofPoint{ calibrationPoints[i].first, calibrationPoints[i].second });
-        line2.addVertex(ofPoint{ calibrationPoints[j].first, calibrationPoints[j].second });
+        line2.addVertex(calibrationPoints[i]);
+        line2.addVertex(calibrationPoints[j]);
         debugLines.push_back(line2);
         debugLineColors.push_back({ 0,200,0 });
     }
 
+    debugLines.erase(debugLines.begin(), debugLines.begin() + 3);
+    debugLineColors.erase(debugLineColors.begin(), debugLineColors.begin() + 3);
 
+    genTransMatrix(0);
+    genTransMatrix(1);
+    genTransMatrix(2);
 
     state = appState::running;
     std::cout << "Finished calibration.\n";

@@ -22,7 +22,6 @@
 
 #include <memory>
 #include <array>
-#include <utility>
 #include <vector>
 
 #include <opencv.hpp>
@@ -49,6 +48,9 @@ public:
 	auto update() -> void override;
 	auto draw() -> void override;
 
+	auto drawDebug() -> void;
+
+	auto genTransMatrix(int i) -> void;
 	auto finishCalibration() -> void;
 	auto reCalibrate() -> void;
 
@@ -83,12 +85,14 @@ private:
 
 	int threshold{80};
 
+	bool displayDebugVisualisation = true;
+
 	appState state = calibration;
 	int pointsCalibrated = 0;
-	std::array<std::pair<float, float>, 3> calibrationPoints;
-	std::array<std::pair<float, float>, 3> transMatrices;
+	std::array<ofPoint, 3> calibrationPoints;
+	std::array<ofPoint, 3> transMatrices;
 
-	std::pair<float, float> centerPoint;
+	ofPoint centerPoint;
 
 	std::vector<ofPolyline> debugLines;
 	std::vector<ofColor> debugLineColors;
