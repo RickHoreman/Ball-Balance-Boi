@@ -98,7 +98,7 @@ auto ofApp::trackball() -> void {
                 ballPosPerAxis[j] = (ballPos.x - centerPoint.x) * transMatrices[j].x + (ballPos.y - centerPoint.y) * transMatrices[j].y;
                 output += std::format("{:.2f} {:.2f} ", ballPosPerAxis[j], setPointPerAxis[j]);
             }
-            std::cout << output << "\n";
+            std::cout << output << std::endl;
         }
     }
 
@@ -278,16 +278,15 @@ auto ofApp::drawDebug() -> void {
 
     if (state == appState::running) {
         for (int i{ 0 }; i < transMatrices.size(); i++) {
-            ofPoint mousePos{ float(ofGetMouseX()), float(ofGetMouseY()) };
 
-            float result = (mousePos.x - centerPoint.x) * transMatricesPreScale[i].x + (mousePos.y - centerPoint.y) * transMatricesPreScale[i].y; // This should happen elsewhere (too) probably idunno
+            float result = (ballPos.x - centerPoint.x) * transMatricesPreScale[i].x + (ballPos.y - centerPoint.y) * transMatricesPreScale[i].y; // This should happen elsewhere (too) probably idunno
 
             ofPoint v = calibrationPoints[i] - centerPoint;
             float mV = std::sqrt(std::pow(v.x, 2) + std::pow(v.y, 2));
             ofPoint resPos = (v / mV) * result;
 
             ofPolyline resLine;
-            resLine.addVertices({ mousePos, resPos + centerPoint });
+            resLine.addVertices({ ballPos, resPos + centerPoint });
             ofColor color;
             switch (i) {
             case 0: color = { 255,255,0 }; break;
@@ -299,7 +298,7 @@ auto ofApp::drawDebug() -> void {
 
             //Scaled output shown as sliders:
             
-            float scaledRes = (mousePos.x - centerPoint.x) * transMatrices[i].x + (mousePos.y - centerPoint.y) * transMatrices[i].y;
+            float scaledRes = (ballPos.x - centerPoint.x) * transMatrices[i].x + (ballPos.y - centerPoint.y) * transMatrices[i].y;
             
             ofPoint displayPos{ 650.f, 50.f + 30.f*i };
 
