@@ -52,6 +52,7 @@ public:
 
 	auto genTransMatrix(int i) -> void;
 	auto finishCalibration() -> void;
+	auto setSetPoint(int x, int y) -> void;
 	auto reCalibrate() -> void;
 
 	auto keyPressed(int key) -> void override;
@@ -90,9 +91,18 @@ private:
 	appState state = calibration;
 	int pointsCalibrated = 0;
 	std::array<ofPoint, 3> calibrationPoints;
+	std::array<ofPoint, 3> transMatricesPreScale;
 	std::array<ofPoint, 3> transMatrices;
 
+	ofPoint targetCenter;
+	float targetScale;
+
 	ofPoint centerPoint;
+
+	ofPoint ballPos;
+	ofPoint setPoint;
+	std::array<float, 3> ballPosPerAxis;
+	std::array<float, 3> setPointPerAxis;
 
 	std::vector<ofPolyline> debugLines;
 	std::vector<ofColor> debugLineColors;

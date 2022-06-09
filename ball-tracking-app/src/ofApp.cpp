@@ -80,14 +80,23 @@ auto ofApp::trackball() -> void {
 
     for (size_t i = 0; i < circles.size(); i++)
     {
-        cv::Vec3i c = circles[i];
-        cv::Point center = cv::Point(c[0], c[1]);
-        // circle center
-        circle(frame, center, 1, cv::Scalar(0, 100, 100), 3, cv::LINE_AA);
-        // circle outline
-        int radius = c[2];
-        circle(frame, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
-        //std::cout << i << ": " << center.x << ";" << center.y << "\n";
+        if (i == 0) {
+            cv::Vec3i c = circles[i];
+            cv::Point center = cv::Point(c[0], c[1]);
+            // circle center
+            circle(frame, center, 1, cv::Scalar(0, 100, 100), 3, cv::LINE_AA);
+            // circle outline
+            int radius = c[2];
+            circle(frame, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
+            //std::cout << i << ": " << center.x << ";" << center.y << "\n";
+            ballPos = { float(center.x), float(center.y) };
+            string output;
+            for (int j{}; j < 3; j++) {
+                ballPosPerAxis[j] = (ballPos.x - centerPoint.x) * transMatrices[j].x + (ballPos.y - centerPoint.y) * transMatrices[j].y;
+                output += std::format("{:.2f} {:.2f} ", ballPosPerAxis[j], setPointPerAxis[j]);
+            }
+            std::cout << output << "\n";
+        }
     }
 
     //Draw crosshair
@@ -233,7 +242,7 @@ auto ofApp::drawDebug() -> void {
         for (int i{ 0 }; i < transMatrices.size(); i++) {
             ofPoint mousePos{ float(ofGetMouseX()), float(ofGetMouseY()) };
 
-            float result = (mousePos.x - centerPoint.x) * transMatrices[i].x + (mousePos.y - centerPoint.y) * transMatrices[i].y; // This should happen elsewhere (too) probably idunno
+            float result = (mousePos.x - centerPoint.x) * transMatricesPreScale[i].x + (mousePos.y - centerPoint.y) * transMatricesPreScale[i].y; // This should happen elsewhere (too) probably idunno
 
             ofPoint v = calibrationPoints[i] - centerPoint;
             float mV = std::sqrt(std::pow(v.x, 2) + std::pow(v.y, 2));
@@ -251,12 +260,8 @@ auto ofApp::drawDebug() -> void {
             resLine.draw();
 
             //Scaled output shown as sliders:
-            float targetSideSize = 250; // Move target related calculations stuff elsewhere (only needs to happen once)
-            float targetHeight = std::sqrt(std::pow(targetSideSize, 2) - std::pow(targetSideSize / 2.f, 2));
-            std::array<ofPoint, 3> targetPoints{ ofPoint{targetSideSize / 2.f, 0.f}, ofPoint{0.f, targetHeight}, ofPoint{targetSideSize, targetHeight} };
-            ofPoint targetCenter{(targetPoints[0].x + targetPoints[1].x + targetPoints[2].x)/3.f, (targetPoints[0].y + targetPoints[1].y + targetPoints[2].y) / 3.f };
-            float targetScale = targetCenter.x;
-            float scaledRes = result / mV * targetScale;
+            
+            float scaledRes = (mousePos.x - centerPoint.x) * transMatrices[i].x + (mousePos.y - centerPoint.y) * transMatrices[i].y;
             
             ofPoint displayPos{ 650.f, 50.f + 30.f*i };
 
@@ -278,8 +283,16 @@ auto ofApp::drawDebug() -> void {
             ofPolyline helper;
             helper.addVertices({ resPos + centerPoint, centerPoint });
             helper.draw();
+
+            ofSetColor({ 255, 128, 128 });
+            ofPolyline setpointer;
+            setpointer.addVertices({ displayPos + ofPoint{setPointPerAxis[i] + targetScale, -5}, displayPos + ofPoint{setPointPerAxis[i] + targetScale, 5}});
+            setpointer.draw();
         }
     }
+
+    ofSetColor({ 255, 128, 128 });
+    ofDrawCircle(setPoint, 5.f);
 
     ofSetColor({ 255,255,255 });
 }
@@ -298,11 +311,13 @@ auto ofApp::genTransMatrix(int i) -> void {
         rTrans += M_PI;
     }
     vTrans = { std::cos(rTrans) * vTrans.x - std::sin(rTrans) * vTrans.y, std::sin(rTrans) * vTrans.x + std::cos(rTrans) * vTrans.y };
-    transMatrices[i] = vTrans;
+    transMatricesPreScale[i] = vTrans;
+
+    transMatrices[i] = vTrans / mV * targetScale;
 };
 
 auto ofApp::finishCalibration() -> void {
-    std::cout << "Finishing calibration.\n";
+    //std::cout << "Finishing calibration.\n";
 
     centerPoint = { (calibrationPoints[0].x + calibrationPoints[1].x + calibrationPoints[2].x) / 3, (calibrationPoints[0].y + calibrationPoints[1].y + calibrationPoints[2].y) / 3 };
 
@@ -327,12 +342,27 @@ auto ofApp::finishCalibration() -> void {
     debugLines.erase(debugLines.begin(), debugLines.begin() + 3);
     debugLineColors.erase(debugLineColors.begin(), debugLineColors.begin() + 3);
 
+    float targetSideSize = 250; // Move target related calculations stuff elsewhere (only needs to happen once)
+    float targetHeight = std::sqrt(std::pow(targetSideSize, 2) - std::pow(targetSideSize / 2.f, 2));
+    std::array<ofPoint, 3> targetPoints{ ofPoint{targetSideSize / 2.f, 0.f}, ofPoint{0.f, targetHeight}, ofPoint{targetSideSize, targetHeight} };
+    targetCenter = { (targetPoints[0].x + targetPoints[1].x + targetPoints[2].x) / 3.f, (targetPoints[0].y + targetPoints[1].y + targetPoints[2].y) / 3.f };
+    targetScale = targetCenter.x;
+
     genTransMatrix(0);
     genTransMatrix(1);
     genTransMatrix(2);
 
+    setSetPoint(640/2, 480/2);
+
     state = appState::running;
-    std::cout << "Finished calibration.\n";
+    //std::cout << "Finished calibration.\n";
+}
+
+auto ofApp::setSetPoint(int x, int y) -> void {
+    setPoint = { float(x), float(y) };
+    for (int i{}; i < 3; i++) {
+        setPointPerAxis[i] = (x - centerPoint.x) * transMatrices[i].x + (y - centerPoint.y) * transMatrices[i].y;
+    }
 }
 
 auto ofApp::reCalibrate() -> void {
@@ -362,19 +392,25 @@ auto ofApp::mousePressed(int x, int y, int button) -> void {
     switch (button) {
     case 0:
         switch (state) {
-        case appState::calibration:
+        case appState::calibration: {
             calibrationPoints[pointsCalibrated] = { float(x), float(y) };
             pointsCalibrated++;
-            std::cout << "Point: " << pointsCalibrated << " x: " << x << " y: " << y << "\n";
+            //std::cout << "Point: " << pointsCalibrated << " x: " << x << " y: " << y << "\n";
             ofPolyline line;
-            line.addVertex(ofPoint{ 640 / 2, 480 / 2 });
+            line.addVertex(ofPoint{ 640 / 2.f, 480 / 2.f });
             line.addVertex(ofPoint{ float(x), float(y) });
             debugLines.push_back(line);
             debugLineColors.push_back({ 100, 0, 0 });
-            if(pointsCalibrated >= 3){
+            if (pointsCalibrated >= 3) {
                 finishCalibration();
             }
             break;
+        }
+        case appState::running: {
+            setSetPoint(x, y);
+            //std::cout << "new setPoint x: " << x << " y: " << y << "\n";
+            break;
+        }
         }
         break;
     case 1:

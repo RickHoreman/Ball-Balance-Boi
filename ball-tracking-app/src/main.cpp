@@ -29,8 +29,7 @@ auto main() -> int {
 	ofSetupOpenGL(screen.width, screen.height, OF_WINDOW);
 
 	try {
-		auto app = ofApp{};
-		ofRunApp(&app);
+		ofRunApp(new ofApp{});
 	} catch (std::exception const& error) {
 		std::cerr << "unexpected exception occurred: " << error.what();
 		return EXIT_FAILURE;
