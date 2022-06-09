@@ -30,12 +30,11 @@ auto main() -> int {
 
 	try {
 		ofRunApp(new ofApp{});
+		return EXIT_SUCCESS;
 	} catch (std::exception const& error) {
 		std::cerr << "unexpected exception occurred: " << error.what();
-		return EXIT_FAILURE;
 	} catch (...) {
 		std::cerr << "unhandled exception occurred";
-		return EXIT_FAILURE;
 	}
-	return EXIT_SUCCESS;
+	return EXIT_FAILURE;
 }

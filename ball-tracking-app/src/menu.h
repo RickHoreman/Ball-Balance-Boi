@@ -15,11 +15,106 @@
 
 #include <cctype>
 #include <format>
-#include <map>
+#include <functional>
 #include <string>
+#include <type_traits>
+#include <unordered_map>
 #include <utility>
 
+/**
+ * @namespace ..
+ * @brief ..
+ */
 namespace opt {
+
+/**
+ * @class ..
+ * @brief ..
+ * @details ..
+ */
+template<typename Accessor, typename Mutator>
+class dispatcher {
+public:
+    /**
+     * @brief ..
+     */
+    dispatcher(Accessor accessor, Mutator mutator):
+        accessor_{std::move(accessor)},
+        mutator_{std::move(mutator)}
+    {}
+
+    /**
+     * @brief ..
+     * @details ..
+     * @return ..
+     */
+    constexpr auto accessor() const noexcept -> Accessor const&
+    { return accessor_; }
+
+    /**
+     * @brief ..
+     * @details ..
+     * @return ..
+     */
+    constexpr auto mutator() const noexcept -> Mutator const&
+    { return mutator_; }
+
+    /**
+     * @brief ..
+     */
+    friend auto operator==(dispatcher const&, dispatcher const&) -> bool = default;
+
+private:
+    Accessor accessor_;
+    Mutator mutator_;
+};
+
+/**
+ * @struct ..
+ * @brief ..
+ * @details ..
+ * @{
+ */
+template<typename...>
+struct class_type_of;
+
+template<typename Signature, typename Class>
+struct class_type_of<Signature Class::*> {
+    using class_type = Class;
+};
+/** @} */
+
+/**
+ * @typedef ..
+ * @brief ..
+ */
+template<typename F>
+using class_type_of_t = typename class_type_of<F>::class_type;
+
+/**
+ * @brief ..
+ * @details ..
+ * @tparam ..
+ * @tparam ..
+ * @tparam ..
+ * @return ..
+ * 
+ * @todo require non-types to be pointer to member functions
+ */
+template<auto Accessor, auto Mutator, typename Value = void>
+constexpr auto dispatch() noexcept {
+    using accessor_type = decltype(Accessor);
+    using class_type = class_type_of_t<accessor_type>;
+    using result_type = std::invoke_result_t<accessor_type, class_type>;
+    using value_type = std::conditional_t<
+        std::is_same_v<Value, void>, result_type, Value>;
+    return dispatcher{
+        +[](class_type const& object) -> value_type
+        { return std::invoke(Accessor, object); },
+        +[](class_type& object, value_type value)
+        { std::invoke(Mutator, object, value); }
+    };
+}
 
 /**
  * @class ..
@@ -30,8 +125,14 @@ namespace opt {
  * 
  * @todo require types to be invocable
  */
-template<typename Getter, typename Setter>
+template<typename Accessor, typename Mutator>
 class option {
+    /**
+     * @typedef ..
+     * @brief ..
+     */
+    using dispatcher_type = dispatcher<Accessor, Mutator>;
+
 public:
     /**
      * @brief ..
@@ -45,10 +146,9 @@ public:
      * @param[in] .. ..
      * @param[in] .. ..
      */
-    constexpr option(std::string name, Getter getter, Setter setter):
+    constexpr option(std::string name, dispatcher_type dispatcher_obj):
         name_{std::move(name)},
-        getter_{std::move(getter)},
-        setter_{std::move(setter)}
+        dispatcher_{std::move(dispatcher_obj)}
     {}
 
     /**
@@ -59,8 +159,8 @@ public:
      * @return ..
      */
     template<typename... Ts>
-    constexpr decltype(auto) getvalue(Ts&&... args) const noexcept
-    { return getter_(std::forward<Ts>(args)...); }
+    constexpr auto getvalue(Ts&&... args) const noexcept -> decltype(auto)
+    { return std::invoke(dispatcher_.accessor(), std::forward<Ts>(args)...); }
 
     /**
      * @brief ..
@@ -71,7 +171,7 @@ public:
      */
     template<typename... Ts>
     constexpr auto setvalue(Ts&&... args) const noexcept -> void
-    { setter_(std::forward<Ts>(args)...); }
+    { return std::invoke(dispatcher_.mutator(), std::forward<Ts>(args)...); }
 
     /**
      * @brief ..
@@ -82,7 +182,7 @@ public:
      */
     template<typename... Ts>
     constexpr auto to_string(Ts&&... args) const -> std::string {
-        return std::format("{:16}{:3}\n",
+        return std::format("{:16} {:3}\n",
             name_ + ':', getvalue(std::forward<Ts>(args)...));
     }
 
@@ -92,20 +192,26 @@ public:
     friend auto operator==(option const&, option const&) -> bool = default;
 
 private:
-    std::string name_; /**< .. */
-    Getter getter_;    /**< .. */
-    Setter setter_;    /**< .. */
+    std::string name_;           /**< .. */
+    dispatcher_type dispatcher_; /**< .. */
 };
 
 /**
  * @class ..
  * @brief ..
  * @details ..
+ * @tparam ..
  * 
  * @todo require types to be invocable
  */
-template<typename... Actions>
+template<typename... Dispatchers>
 class menu {
+    /**
+     * @typedef ..
+     * @brief ..
+     */
+    using option_type = option<Dispatchers...>;
+
 public:
     /**
      * @brief ..
@@ -130,7 +236,7 @@ public:
      * @param[in] .. ..
      * @return ..
      */
-    constexpr auto selection() const -> option<Actions...> const&
+    constexpr auto selection() const -> option_type const&
     { return options.at(selection_); }
 
     /**
@@ -154,7 +260,9 @@ public:
     template<typename... Ts>
     constexpr auto to_string(Ts&&... args) const -> std::string {
         auto result = std::string{};
-        result.reserve(32 * options.size());
+        auto const max_option_name = 24;
+        result.reserve(max_option_name * options.size());
+
         for (auto const& [key, option] : options) {
             auto const upperkey = static_cast<char>(std::toupper(key));
             result += std::format("{} - {}", upperkey,
@@ -169,8 +277,14 @@ public:
     friend auto operator==(menu const&, menu const&) -> bool = default;
 
 private:
-    std::map<unsigned char, option<Actions...>> options; /**< .. */
-    unsigned char selection_{};                          /**< .. */
+    /**
+     * @typedef ..
+     * @brief ..
+     */
+    using map_type = std::unordered_map<unsigned char, option_type>;
+
+    map_type options;           /**< .. */
+    unsigned char selection_{}; /**< .. */
 };
 
 } // namespace opt

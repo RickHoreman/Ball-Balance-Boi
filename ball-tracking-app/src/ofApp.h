@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <tuple>
 
 /**
  * @class ofApp
@@ -64,6 +65,7 @@ private:
 	auto erase_input_value() noexcept -> void;
 	auto add_input_value(unsigned char key) noexcept -> void;
 	auto initmenu() noexcept -> void;
+	auto drawcamera(float x, float y) const -> void;
 	auto drawmenu(float x, float y) const -> void;
 	auto drawfps(float x, float y) const -> void;
 	auto trackball() -> void;
@@ -72,11 +74,20 @@ private:
 	cam::framestats camstats;
 	cam::config camcfg{cam::config::defaults()};
 	std::unique_ptr<std::uint8_t[]> camframe;
+	cv::Mat trackframe;
+	cv::Point ballpos;
 
 	enum class keyinput{app, menu, value};
 	keyinput inputmode{};
-	using getter_t = std::uint8_t (*)(cam::ps3cam const&);
-	using setter_t = void (*)(cam::ps3cam&, std::uint8_t);
+	 using getter_t = std::uint8_t (*)(cam::ps3cam const&);
+	 using setter_t = void (*)(cam::ps3cam&, std::uint8_t);
+	// using getter_t = std::uint8_t (cam::ps3cam::*)() const;
+	// using setter_t = void (cam::ps3cam::*)(std::uint8_t);
+	//using getter_t = std::uint8_t (cam::ps3cam::*)() const;
+	//using setter_t = void (cam::ps3cam::*)(std::uint8_t);
+	// using 
+	// using accessorpack = std::tuple<std::uint8_t (cam::ps3cam::*)() const, bool (cam::ps3cam::*)() const>;
+	// using mutatorpack = std::tuple<void (cam::ps3cam::*)(std::uint8_t), void (cam::ps3cam::*)(bool)>;
 	opt::menu<getter_t, setter_t> inputmenu;
 	std::string inputvalue;
 	std::string inputprompt;

@@ -46,7 +46,7 @@ auto framestats::update() -> void {
  * @internal ..
  */
 auto getdevice(devlist::size_type device_id) -> devptr {
-    auto const& devices{ps3cam::getDevices()};
+    auto const& devices = ps3cam::getDevices();
     return device_id < devices.size()
         ? devices[device_id]
         : devptr{};
@@ -68,8 +68,8 @@ auto initcamera(ps3cam& camera, config const& camcfg) -> status {
     camera.setGreenBalance(camcfg.balance.green);
     camera.setBlueBalance(camcfg.balance.blue);
     camera.setAutoWhiteBalance(camcfg.balance.autowhite);   
-    camera.setSharpness(camcfg.sharpness);
     camera.setExposure(camcfg.exposure);
+    camera.setSharpness(camcfg.sharpness);
     camera.setBrightness(camcfg.brightness);
     camera.setContrast(camcfg.contrast);
     camera.setGain(camcfg.gain);
