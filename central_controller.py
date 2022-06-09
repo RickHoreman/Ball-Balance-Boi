@@ -1,23 +1,21 @@
 from pid_controller import PID_Controller
-# import serial_controller as sc
-import math
-from operator import add
+import serial_controller as sc
 from matplotlib import pyplot as plt
 import subprocess
 
-r0, r1, r2 = math.radians(0), math.radians(120), math.radians(240)
+# r0, r1, r2 = math.radians(0), math.radians(120), math.radians(240)
 
-v0 = (math.cos(r0) * 0 - math.sin(r0) * 1, math.sin(r0) * 0 + math.cos(r0) * 1)
-v1 = (math.cos(r1) * 0 - math.sin(r1) * 1, math.sin(r1) * 0 + math.cos(r1) * 1)
-v2 = (math.cos(r2) * 0 - math.sin(r2) * 1, math.sin(r2) * 0 + math.cos(r2) * 1)
+# v0 = (math.cos(r0) * 0 - math.sin(r0) * 1, math.sin(r0) * 0 + math.cos(r0) * 1)
+# v1 = (math.cos(r1) * 0 - math.sin(r1) * 1, math.sin(r1) * 0 + math.cos(r1) * 1)
+# v2 = (math.cos(r2) * 0 - math.sin(r2) * 1, math.sin(r2) * 0 + math.cos(r2) * 1)
 # plt.plot([v0[0], v1[0], v2[0]], [v0[1], v1[1], v2[1]])
 # plt.show()
 
-kp, ki, kd = 0.1, 0.000001, 7
+kp, ki, kd = 0.5, 0.000001, 7
 
-servoTop = PID_Controller(kp, ki, kd, v0)
-servoLeft = PID_Controller(kp, ki, kd, v1)
-servoRight = PID_Controller(kp, ki, kd, v2)
+servoTop = PID_Controller(kp, ki, kd)
+servoLeft = PID_Controller(kp, ki, kd)
+servoRight = PID_Controller(kp, ki, kd)
 
 ### sim
 # simLength = 400
@@ -34,16 +32,22 @@ servoRight = PID_Controller(kp, ki, kd, v2)
 # y = []
 ###
 
-pos = [0, 0]
-setpoint = [400, 400]
+ballPosPerAxis = [0, 0, 0]
+setpointPerAxis = [0, 0, 0]
 
 cpp = subprocess.Popen("", executable="C:/Users/rick2/OneDrive/HU/MRB/libs/openFrameworks/apps/myApps/ball-tracking-app/bin/ball-tracking-app.exe", stdin=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True, bufsize=1)
 while cpp.poll() == None:
     stringPos = cpp.stdout.readline().split()
-    print(stringPos)
-    # if len(stringPos) > 1:
-    #     pos[0] = int(stringPos[0])
-    #     pos[1] = int(stringPos[1])
+    # print(stringPos)
+    if len(stringPos) > 5:
+        ballPosPerAxis[0] = float(stringPos[0])
+        setpointPerAxis[0] = float(stringPos[1])
+        ballPosPerAxis[1] = float(stringPos[2])
+        setpointPerAxis[1] = float(stringPos[3])
+        ballPosPerAxis[2] = float(stringPos[4])
+        setpointPerAxis[2] = float(stringPos[5])
+    # print(ballPosPerAxis)
+    # print(setpointPerAxis)
 
 ### sim
 # for i in range(0,simLength):
@@ -65,17 +69,17 @@ while cpp.poll() == None:
     #print(f"roll: {roll}, pitch: {pitch}, pos: {pos}")
     ###
 
-#     servoTopAct = servoTop.getAction(pos, setpoint)
-#     servoLeftAct = servoLeft.getAction(pos, setpoint)
-#     servoRightAct = servoRight.getAction(pos, setpoint)
+    servoTopAct = servoTop.getAction(ballPosPerAxis[0], setpointPerAxis[0])
+    servoLeftAct = servoLeft.getAction(ballPosPerAxis[1], setpointPerAxis[1])
+    servoRightAct = servoRight.getAction(ballPosPerAxis[2], setpointPerAxis[2])
 
-#     sc.setAngle(servoTopAct + 45.0)
-#     sc.setAngle(servoLeftAct + 45.0)
-#     sc.setAngle(servoRightAct + 45.0)
+    sc.setAngle(servoTopAct + 45.0)
+    sc.setAngle(servoLeftAct + 45.0)
+    sc.setAngle(servoRightAct + 45.0)
 
-# servoTop.graph()
-# servoLeft.graph()
-# servoRight.graph()
+servoTop.graph()
+servoLeft.graph()
+servoRight.graph()
 
 ###sim
 # plt.figure()

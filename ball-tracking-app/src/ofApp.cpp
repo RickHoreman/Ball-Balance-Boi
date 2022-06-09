@@ -77,7 +77,7 @@ auto ofApp::trackball() -> void {
     vector<cv::Vec3f> circles;
     HoughCircles(frame, circles, cv::HOUGH_GRADIENT, 1,
         frame.rows / 16,  // change this value to detect circles with different distances to each other
-        200, 20, 20, 75 // change the last two parameters
+        200, 20, 10, 75 // change the last two parameters
    // (min_radius & max_radius) to detect larger circles
     );
 

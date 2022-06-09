@@ -2,13 +2,10 @@ from time import time
 from matplotlib import pyplot as plt
 
 class PID_Controller:
-    def __init__(self, kp, ki, kd, angleVector):
-        """kp, ki, and kd are the p, i, and d scalars if the pid controller and should be some float,
-        angleVector should be a tuple or list of length 2 corresponding to some vector of amplitude 1 pointing in the same direction as the servo in the physical setup relative to the xy position provided by the camera tracking module."""
+    def __init__(self, kp, ki, kd):
         self.kp = kp
         self.ki = ki
         self.kd = kd
-        self.angleVector = angleVector
 
         self.prevError = 0
         self.iError = 0
@@ -23,7 +20,7 @@ class PID_Controller:
         ###
 
     def getAction(self, pos, setpoint):
-        error = sum([a * b for a, b in zip(setpoint, self.angleVector)]) - sum([a * b for a, b in zip(pos, self.angleVector)])
+        error = setpoint - pos
         self.iError += error
         self.iErrors.append(self.iError * self.ki)
         action = self.kp * error + self.ki * self.iError + self.kd * ((error - self.prevError))# / (time() - prevTime)) time interval too short, causes div by 0 error
@@ -34,7 +31,7 @@ class PID_Controller:
 
         self.errors.append(error/10.0)
         self.out.append(action)
-        self.poss.append(sum([a * b for a, b in zip(pos, self.angleVector)])/10.0)
+        self.poss.append(pos/10.0)
 
         return action
 

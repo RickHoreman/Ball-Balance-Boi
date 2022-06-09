@@ -157,7 +157,7 @@ struct config {
     static constexpr auto defaults() noexcept -> config {
         return {
             .format{cfg::format::Gray},
-            .frame{.width{640},.height{480},.rate{60}},
+            .frame{.width{640},.height{480},.rate{75}},
             .balance{.red{128},.green{128},.blue{128},.autowhite{false}},
             .sharpness{0},
             .exposure{30},
