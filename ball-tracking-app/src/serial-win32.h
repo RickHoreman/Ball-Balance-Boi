@@ -10,8 +10,8 @@
  * @details ..
  */
 
-#ifndef COM_SERIAL_WIN32_H
-#define COM_SERIAL_WIN32_H
+#ifndef COMM_SERIAL_WIN32_H
+#define COMM_SERIAL_WIN32_H
 
 #include "serial.h"
 
