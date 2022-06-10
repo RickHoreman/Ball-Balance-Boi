@@ -11,6 +11,8 @@
  */
 
 #include "ofApp.h"
+#include "serial-win32.h"
+
 #include <ofMain.h>
 
 #include <cstdlib>
@@ -29,7 +31,8 @@ auto main() -> int {
 	ofSetupOpenGL(screen.width, screen.height, OF_WINDOW);
 
 	try {
-		ofRunApp(new ofApp{});
+		auto serial = comm::serial_win32{"COM6", 115'200};
+		ofRunApp(new ofApp{serial});
 		return EXIT_SUCCESS;
 	} catch (std::exception const& error) {
 		std::cerr << "unexpected exception occurred: " << error.what();

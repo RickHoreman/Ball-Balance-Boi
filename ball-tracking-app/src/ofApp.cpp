@@ -14,16 +14,18 @@
 #include "ps3eye.h"
 #include "camera.h"
 
+#include <windows.h>
+
 #include <ofxCv.h>
 #include <opencv.hpp>
 #include <tracking.hpp> // needed?
 
 #include <cctype>
 #include <charconv>
-#include <exception>
 #include <format>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 
 /**
  * @copydoc ofApp::setup
@@ -43,6 +45,7 @@ auto ofApp::setup() -> void {
         // CV_8UC1, camframe.get()};
     ofSetFrameRate(75);
     initmenu();
+    //
 }
 
 auto ofApp::initmenu() noexcept -> void {
@@ -281,7 +284,7 @@ auto ofApp::add_input_value(unsigned char key) noexcept -> void {
     inputvalue += key;
 }
 
-auto ofApp::keyReleased(int key) -> void{}
+auto ofApp::keyReleased(int key) -> void {}
 auto ofApp::mouseMoved(int x, int y ) -> void {}
 auto ofApp::mouseDragged(int x, int y, int button) -> void {}
 auto ofApp::mousePressed(int x, int y, int button) -> void {}

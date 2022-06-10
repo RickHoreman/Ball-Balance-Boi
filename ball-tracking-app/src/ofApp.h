@@ -16,6 +16,7 @@
 #include "ps3eye.h"
 #include "camera.h"
 #include "menu.h"
+#include "serial.h"
 
 #include <ofMain.h>
 #include <ofBaseApp.h>
@@ -38,6 +39,12 @@ public:
 	 * @brief ..
 	 */
 	ofApp() = default;
+
+	/**
+	 * @brief ..
+	 */
+	ofApp(comm::serial& serial)
+		: serialcomm{&serial} {}
 
 	auto setup() -> void override;
 	auto exit() -> void override;
@@ -76,19 +83,15 @@ private:
 	std::unique_ptr<std::uint8_t[]> camframe;
 	cv::Mat trackframe;
 	cv::Point ballpos;
+	template<typename T>
+	using access_ptr = T*;
+	access_ptr<comm::serial> serialcomm;
 
 	enum class keyinput{app, menu, value};
 	keyinput inputmode{};
-	 using getter_t = std::uint8_t (*)(cam::ps3cam const&);
-	 using setter_t = void (*)(cam::ps3cam&, std::uint8_t);
-	// using getter_t = std::uint8_t (cam::ps3cam::*)() const;
-	// using setter_t = void (cam::ps3cam::*)(std::uint8_t);
-	//using getter_t = std::uint8_t (cam::ps3cam::*)() const;
-	//using setter_t = void (cam::ps3cam::*)(std::uint8_t);
-	// using 
-	// using accessorpack = std::tuple<std::uint8_t (cam::ps3cam::*)() const, bool (cam::ps3cam::*)() const>;
-	// using mutatorpack = std::tuple<void (cam::ps3cam::*)(std::uint8_t), void (cam::ps3cam::*)(bool)>;
-	opt::menu<getter_t, setter_t> inputmenu;
+	using getter_type = std::uint8_t (*)(cam::ps3cam const&);
+	using setter_type = void (*)(cam::ps3cam&, std::uint8_t);
+	opt::menu<getter_type, setter_type> inputmenu;
 	std::string inputvalue;
 	std::string inputprompt;
 	std::string menuprompt;
