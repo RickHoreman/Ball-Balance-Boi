@@ -16,6 +16,7 @@
 #include "ps3eye.h"
 #include "camera.h"
 #include "menu.h"
+#include "serial.h"
 
 #include <ofMain.h>
 #include <ofBaseApp.h>
@@ -44,7 +45,8 @@ public:
 	/**
 	 * @brief ..
 	 */
-	ofApp() = default;
+	ofApp(comm::serial& serial)
+		: serialcomm{ &serial } {}
 
 	auto setup() -> void override;
 	auto exit() -> void override;
@@ -83,6 +85,7 @@ private:
 	auto drawmenu(float x, float y) const -> void;
 	auto drawfps(float x, float y) const -> void;
 	auto trackball() -> void;
+	auto pid() -> void;
 
     cam::devptr camera;
 	cam::framestats camstats;
@@ -101,13 +104,6 @@ private:
 	keyinput inputmode{};
 	using getter_t = std::uint8_t(*)(cam::ps3cam const&);
 	using setter_t = void (*)(cam::ps3cam&, std::uint8_t);
-	// using getter_t = std::uint8_t (cam::ps3cam::*)() const;
-	// using setter_t = void (cam::ps3cam::*)(std::uint8_t);
-	//using getter_t = std::uint8_t (cam::ps3cam::*)() const;
-	//using setter_t = void (cam::ps3cam::*)(std::uint8_t);
-	// using 
-	// using accessorpack = std::tuple<std::uint8_t (cam::ps3cam::*)() const, bool (cam::ps3cam::*)() const>;
-	// using mutatorpack = std::tuple<void (cam::ps3cam::*)(std::uint8_t), void (cam::ps3cam::*)(bool)>;
 	opt::menu<getter_t, setter_t> inputmenu;
 	std::string inputvalue;
 	std::string inputprompt;
@@ -133,6 +129,17 @@ private:
 
 	std::vector<ofPolyline> debugLines;
 	std::vector<ofColor> debugLineColors;
+
+	double kp=0.5;
+	double ki=0.000001;
+	double kd = 7.f;
+	std::array<double, 3> prevError{0.f,0.f,0.f};
+	std::array<double, 3> iError{0.f,0.f,0.f};
+	std::array<double, 3> servoAction{ 0.f,0.f,0.f };
+
+	template<typename T>
+	using access_ptr = T*;
+	access_ptr<comm::serial> serialcomm;
 };
 
 #endif

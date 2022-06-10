@@ -15,7 +15,7 @@
 #include "ps3eye.h"
 #include "camera.h"
 #include "menu.h"
-// #include "memory.h"
+#include "serial.h"
 
 #include "ofxCv.h"
 #include <opencv.hpp>
@@ -29,7 +29,7 @@
 #include <format>
 #include <iostream>
 #include <memory>
-
+#include <algorithm>
 
 
 #define MINTRACKAREA 50
@@ -54,16 +54,37 @@ auto ofApp::trackball() -> void {
             int radius = c[2];
             circle(frame, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
             //std::cout << i << ": " << center.x << ";" << center.y << "\n";
-            ballPos = { float(center.x), float(center.y) };
-            string output;
-            for (int j{}; j < 3; j++) {
-                ballPosPerAxis[j] = (ballPos.x - centerPoint.x) * transMatrices[j].x + (ballPos.y - centerPoint.y) * transMatrices[j].y;
-                output += std::format("{:.2f} {:.2f} ", ballPosPerAxis[j], setPointPerAxis[j]);
+            if (state == appState::running) {
+                ballPos = { float(center.x), float(center.y) };
+                string output;
+                for (int j{}; j < 3; j++) {
+                    ballPosPerAxis[j] = (ballPos.x - centerPoint.x) * transMatrices[j].x + (ballPos.y - centerPoint.y) * transMatrices[j].y;
+                    output += std::format("{:.5f} {:.5f} ", ballPosPerAxis[j], setPointPerAxis[j]);
+                }
+                //std::cout << output << std::endl;
+                pid();
             }
-            std::cout << output << std::endl;
         }
     }
-};
+}
+
+auto ofApp::pid() -> void {
+    string output;
+    string dbg;
+    for (int i{}; i < 3; i++) {
+        double error = setPointPerAxis[i] - ballPosPerAxis[i];
+        iError[i] += error;
+        servoAction[i] = kp * error + ki * iError[i] + kd * (error - prevError[i]);
+        servoAction[i] = std::max(std::min(servoAction[i], 45.0), -10.0);
+        prevError[i] = error;
+        output += std::format("{:.5f} ", servoAction[i] + 45.0);
+        dbg += std::format("{:.5f} {:.5f} {:.5f} ; ", kp * error, ki * iError[i], kd * (error - prevError[i]));
+    }
+    output += "\n";
+    std::cout << output;
+    //std::cout << dbg << std::endl;
+    serialcomm->write(output);
+}
 
 auto ofApp::setup() -> void {
     if (camera = cam::getdevice(); not camera) {
@@ -77,6 +98,7 @@ auto ofApp::setup() -> void {
     frame = cv::Mat{camcfg.frame.height, camcfg.frame.width,
         CV_8UC1, camframe.get()};
     ofSetFrameRate(75);
+    serialcomm->setup();
     initmenu();
 }
 

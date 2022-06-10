@@ -5,7 +5,6 @@
 Servo servo0;
 Servo servo1;
 Servo servo2;
-int i = 0;
 
 // Main code
 void setup(){
@@ -18,22 +17,15 @@ void setup(){
 void loop(){
   if(Serial.available()){
     String posString = Serial.readStringUntil('\n');
-    float pos = posString.toFloat();
-    if(i == 0){
-      servo0.write(pos);
-    }else if(i == 1){
-      servo1.write(pos);
-    }else if(i==2){
-      servo2.write(pos);
-    }
-    
-    Serial.print(i);
-    Serial.print(" : ");
-    Serial.println(pos);
-    
-    i++;
-    i = i%3;
-
+    int i0 = posString.indexOf(' ');
+    int i1 = posString.indexOf(' ', i0+1);
+    int i2 = posString.indexOf(' ', i1+1);
+    float pos0 = posString.substring(0, i0).toFloat();
+    float pos1 = posString.substring(i0+1, i1).toFloat();
+    float pos2 = posString.substring(i1+1, i2).toFloat();
+    servo0.write(pos0);
+    servo1.write(pos1);
+    servo2.write(pos2);
   }
 //  for (pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
 //    // in steps of 1 degree

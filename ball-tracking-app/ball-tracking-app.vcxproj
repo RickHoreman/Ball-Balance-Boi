@@ -223,6 +223,8 @@
     <ClInclude Include="src\camera.h" />
     <ClInclude Include="src\memory.h" />
     <ClInclude Include="src\ps3eye.h" />
+    <ClInclude Include="src\serial-win32.h" />
+    <ClInclude Include="src\serial.h" />
     <ClInclude Include="src\traits.h" />
     <ClInclude Include="..\..\..\addons\ofxOpenCv\src\ofxCvBlob.h" />
     <ClInclude Include="..\..\..\addons\ofxOpenCv\src\ofxCvColorImage.h" />

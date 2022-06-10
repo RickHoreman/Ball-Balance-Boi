@@ -1283,6 +1283,12 @@
     <ClInclude Include="src\menu.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\serial.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\serial-win32.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="icon.rc" />
