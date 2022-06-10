@@ -18,7 +18,7 @@ void setup(){
 void loop(){
   if(Serial.available()){
     String posString = Serial.readStringUntil('\n');
-    int pos = posString.toInt();
+    float pos = posString.toFloat();
     if(i == 0){
       servo0.write(pos);
     }else if(i == 1){
