@@ -26,11 +26,14 @@ void loop(){
     }else if(i==2){
       servo2.write(pos);
     }
+    
+    Serial.print(i);
+    Serial.print(" : ");
+    Serial.println(pos);
+    
     i++;
     i = i%3;
-    
-    Serial.print("You sent me: ");
-    Serial.println(pos);
+
   }
 //  for (pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
 //    // in steps of 1 degree

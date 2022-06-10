@@ -36,47 +36,9 @@
 
 auto ofApp::trackball() -> void {
 
-    // cv::Mat my_mat(rows, cols, CV_8UC1, &buf[0]); //in case of BGR image use CV_8UC3
-    
-    // Mat frame{camcfg.frame.width, camcfg.frame.height, CV_8UC1, frameptr};
-
-    //Resize large images to reduce processing load
-    // cap >> frame;
-
-
-
-    //Convert RGB to HSV colormap
-    //and apply Gaussain blur
-    //Mat hsvFrame;
-    //cvtColor(frame, hsvFrame, CV_RGB2HSV);
-    // cvtColor(frame, hsvFrame, CV_BGR2HSV);
-
-    //blur(hsvFrame, hsvFrame, cv::Size(1, 1));
-
-    //Threshold 
-    // Scalar lowerBound = cv::Scalar(55, 100, 50);
-    // Scalar upperBound = cv::Scalar(90, 255, 255);
-    //Scalar lowerBound = cv::Scalar(0, 100, 50);
-    //Scalar upperBound = cv::Scalar(50, 255, 255);
-    //Mat threshFrame;
-    //inRange(hsvFrame, lowerBound, upperBound, threshFrame);
-
-    //Calculate X,Y centroid
-
-    //Moments m = moments(threshFrame, false);
-    //Point com(m.m10 / m.m00, m.m01 / m.m00);
-
-    //Hough method
-    //cv::Mat gray = frame;
-    //cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
-    //medianBlur(frame, frame, 5);
-
-    //cv::equalizeHist(frame, frame);
-    //cv::GaussianBlur(frame, frame, cv::Size(5, 5), 0);
-
     vector<cv::Vec3f> circles;
     HoughCircles(frame, circles, cv::HOUGH_GRADIENT, 1,
-        frame.rows / 16,  // change this value to detect circles with different distances to each other
+        1000,  // change this value to detect circles with different distances to each other
         200, 20, 10, 75 // change the last two parameters
    // (min_radius & max_radius) to detect larger circles
     );
@@ -101,31 +63,8 @@ auto ofApp::trackball() -> void {
             std::cout << output << std::endl;
         }
     }
-
-    //Draw crosshair
-    //Scalar color = cv::Scalar(0, 0, 255);
-    //drawMarker(frame, com, color, cv::MARKER_CROSS, 50, 5);
-
-    // imshow("Tennis Ball", frame);
-    // imshow("Thresholded Tennis Ball", threshFrame);
-    // ofxCv::toOf(frame, colorimg);
-    // ofxCv::drawMat(threshFrame, 600, 400);
-
-    //string str = "pos: ";
-    //str += ofToString(com.x, 2);
-    //str += ", ";
-    //str += ofToString(com.y, 2);
-    //ofDrawBitmapString(str, 10, 50);
-
-    //std::cout << com.x << ' ' << com.y << std::endl;
-
-    // return threshFrame;
 };
 
-/**
- * @copydoc ofApp::setup
- * @internal ..
- */
 auto ofApp::setup() -> void {
     if (camera = cam::getdevice(); not camera) {
         throw std::runtime_error("could not find ps3 camera");
@@ -171,30 +110,12 @@ auto ofApp::initmenu() noexcept -> void {
         opt::dispatch<&ps3cam::getAutogain, &ps3cam::setAutogain, std::uint8_t>());
 }
 
-//char key
-//camcfg& 
-//
-//b - brightness: 678
-//c - contrast:   456
-//s - sharpness:  789
-//
-//new value: 
-
-/**
- * @copydoc ofApp::exit
- * @internal ..
- */
 auto ofApp::exit() -> void {
     if (camera) {
         camera->stop();
     }
-    // camframe.reset();
 }
 
-/**
- * @copydoc ofApp::update
- * @internal ..
- */
 auto ofApp::update() -> void {
     if (not camera) return;
 
@@ -202,34 +123,10 @@ auto ofApp::update() -> void {
     frame.data = camframe.get();
 
     trackball();
-
-    //genTransMatrix(0, { 255,255,0 });
-    //genTransMatrix(1, { 0,255,255 });
-    //genTransMatrix(2, { 255,0,255 });
-
-    // colorimg.setFromPixels(camframe.get(), camcfg.frame.width, camcfg.frame.height);
-    // trackball(camframe.get());
-
-    // grayimg.setFromPixels(camframe.get(), camcfg.frame.width, camcfg.frame.height);
-    // grayimg = colorimg;
-    //diffimg.absDiff(bgimg, grayimg);
-    //diffimg.threshold(threshold);
-    //finder.findContours(diffimg, 20, camcfg.frame.size() / 3, 10, true);
-    //camstats.update();
 }
 
-/**
- * @copydoc ofApp::draw
- * @internal ..
- */
 auto ofApp::draw() -> void {
     ofSetHexColor(0xffffff);
-
-    // grayimg.draw(0, 0);
-    // bgimg.draw(0, camcfg.frame.height);
-    // diffimg.draw(camcfg.frame.width, 0);
-
-    // drawblobs();
 
     ofxCv::drawMat(frame, 0, 0, GL_R8);
 
@@ -251,20 +148,8 @@ auto ofApp::draw() -> void {
     }
 
     drawmenu(10, 150);
-    // //
-
-    //stringstream reportStr;
-    //reportStr << "bg subtraction and blob detection" << endl
-    //    << "press ' ' to capture bg" << endl
-    //    << "threshold " << threshold << " (press: +/-)" << endl
-    //    << "num blobs found " << finder.nBlobs << ", fps: " << ofGetFrameRate();
-    //ofDrawBitmapString(reportStr.str(), 1300, 200);
 }
 
-/**
- * @copydoc ofApp::drawmenu
- * @internal ..
- */
 auto ofApp::drawmenu(float x, float y) const -> void {
     ofDrawBitmapString(std::format("{}\n{}{}",
         menuprompt, inputprompt, inputvalue), x, y);
@@ -279,7 +164,7 @@ auto ofApp::drawDebug() -> void {
     if (state == appState::running) {
         for (int i{ 0 }; i < transMatrices.size(); i++) {
 
-            float result = (ballPos.x - centerPoint.x) * transMatricesPreScale[i].x + (ballPos.y - centerPoint.y) * transMatricesPreScale[i].y; // This should happen elsewhere (too) probably idunno
+            float result = (ballPos.x - centerPoint.x) * transMatricesPreScale[i].x + (ballPos.y - centerPoint.y) * transMatricesPreScale[i].y;
 
             ofPoint v = calibrationPoints[i] - centerPoint;
             float mV = std::sqrt(std::pow(v.x, 2) + std::pow(v.y, 2));
@@ -335,14 +220,11 @@ auto ofApp::drawDebug() -> void {
 }
 
 auto ofApp::genTransMatrix(int i) -> void {
-    //float scale = 200;
     ofPoint vTrans{ 0, 1 };
     ofPoint center = centerPoint;
     ofPoint v = calibrationPoints[i] - center;
 
     float mV = std::sqrt(std::pow(v.x, 2) + std::pow(v.y, 2));
-    //scale = mV;
-    vTrans = vTrans /*/ mPre*//* * (scale / mPre)*/;
     float rTrans = std::atan((v.y) / (v.x)) - std::atan(vTrans.y / vTrans.x);
     if (v.x < 0 or (v.x == 0 and v.y < 0)) {
         rTrans += M_PI;
@@ -354,8 +236,6 @@ auto ofApp::genTransMatrix(int i) -> void {
 };
 
 auto ofApp::finishCalibration() -> void {
-    //std::cout << "Finishing calibration.\n";
-
     centerPoint = { (calibrationPoints[0].x + calibrationPoints[1].x + calibrationPoints[2].x) / 3, (calibrationPoints[0].y + calibrationPoints[1].y + calibrationPoints[2].y) / 3 };
 
     for (int i{ 0 }; i < calibrationPoints.size(); i++) {
@@ -379,7 +259,7 @@ auto ofApp::finishCalibration() -> void {
     debugLines.erase(debugLines.begin(), debugLines.begin() + 3);
     debugLineColors.erase(debugLineColors.begin(), debugLineColors.begin() + 3);
 
-    float targetSideSize = 250; // Move target related calculations stuff elsewhere (only needs to happen once)
+    float targetSideSize = 250;
     float targetHeight = std::sqrt(std::pow(targetSideSize, 2) - std::pow(targetSideSize / 2.f, 2));
     std::array<ofPoint, 3> targetPoints{ ofPoint{targetSideSize / 2.f, 0.f}, ofPoint{0.f, targetHeight}, ofPoint{targetSideSize, targetHeight} };
     targetCenter = { (targetPoints[0].x + targetPoints[1].x + targetPoints[2].x) / 3.f, (targetPoints[0].y + targetPoints[1].y + targetPoints[2].y) / 3.f };
@@ -392,7 +272,6 @@ auto ofApp::finishCalibration() -> void {
     setSetPoint(640/2, 480/2);
 
     state = appState::running;
-    //std::cout << "Finished calibration.\n";
 }
 
 auto ofApp::setSetPoint(int x, int y) -> void {
@@ -409,10 +288,6 @@ auto ofApp::reCalibrate() -> void {
     pointsCalibrated = 0;
 }
 
-/**
- * @copydoc ofApp::keyPressed
- * @internal ..
- */
 auto ofApp::keyPressed(int key) -> void {
     switch (inputmode) {
         case keyinput::app:   return handle_app_input(key);
@@ -422,10 +297,6 @@ auto ofApp::keyPressed(int key) -> void {
     }
 }
 
-/**
- * @copydoc ofApp::handle_app_input
- * @internal ..
- */
 auto ofApp::handle_app_input(int key) noexcept -> void {
     switch (key) {
     case OF_KEY_TAB: return show_menu();
@@ -434,19 +305,11 @@ auto ofApp::handle_app_input(int key) noexcept -> void {
     }
 }
 
-/**
- * @copydoc ofApp::show_menu
- * @internal ..
- */
 auto ofApp::show_menu() noexcept -> void {
     menuprompt = inputmenu.to_string(*camera);
     inputmode = keyinput::menu;
 }
 
-/**
- * @copydoc ofApp::handle_menu_input
- * @internal ..
- */
 auto ofApp::handle_menu_input(int key) noexcept -> void {
     switch (key) {
     case OF_KEY_TAB: return exit_menu();
@@ -454,19 +317,11 @@ auto ofApp::handle_menu_input(int key) noexcept -> void {
     }
 }
 
-/**
- * @copydoc ofApp::exit_menu
- * @internal ..
- */
 auto ofApp::exit_menu() noexcept -> void {
     menuprompt.clear();
     inputmode = keyinput::app;
 }
 
-/**
- * @copydoc ofApp::exit_menu
- * @internal ..
- */
 auto ofApp::select_option(int key) noexcept -> void {
     if (not inputmenu.contains(key)) return;
 
@@ -475,10 +330,6 @@ auto ofApp::select_option(int key) noexcept -> void {
     inputmode = keyinput::value;
 }
 
-/**
- * @copydoc ofApp::handle_input_value
- * @internal ..
- */
 auto ofApp::handle_input_value(int key) -> void {
     switch (key) {
     case OF_KEY_RETURN:    return apply_input_value();
@@ -487,10 +338,6 @@ auto ofApp::handle_input_value(int key) -> void {
     }
 }
 
-/**
- * @copydoc ofApp::apply_input_value
- * @internal ..
- */
 auto ofApp::apply_input_value() -> void {
     if (inputvalue.empty()) return;
 
@@ -504,19 +351,11 @@ auto ofApp::apply_input_value() -> void {
     inputmode = keyinput::menu;
 }
 
-/**
- * @copydoc ofApp::erase_input_value
- * @internal ..
- */
 auto ofApp::erase_input_value() noexcept -> void {
     if (inputvalue.empty()) return;
     inputvalue.pop_back();
 }
 
-/**
- * @copydoc ofApp::add_input_value
- * @internal ..
- */
 auto ofApp::add_input_value(unsigned char key) noexcept -> void {
     if (not std::isdigit(key)) return;
     inputvalue += key;
@@ -529,7 +368,6 @@ auto ofApp::mousePressed(int x, int y, int button) -> void {
         case appState::calibration: {
             calibrationPoints[pointsCalibrated] = { float(x), float(y) };
             pointsCalibrated++;
-            //std::cout << "Point: " << pointsCalibrated << " x: " << x << " y: " << y << "\n";
             ofPolyline line;
             line.addVertex(ofPoint{ 640 / 2.f, 480 / 2.f });
             line.addVertex(ofPoint{ float(x), float(y) });
@@ -542,16 +380,9 @@ auto ofApp::mousePressed(int x, int y, int button) -> void {
         }
         case appState::running: {
             setSetPoint(x, y);
-            //std::cout << "new setPoint x: " << x << " y: " << y << "\n";
             break;
         }
         }
-        break;
-    case 1:
-        //std::cout << "x: " << x << " y: " << y << " center\n";
-        break;
-    case 2:
-        //std::cout << "x: " << x << " y: " << y << " right\n";
         break;
     }
 }
@@ -559,7 +390,6 @@ auto ofApp::mousePressed(int x, int y, int button) -> void {
 auto ofApp::keyReleased(int key) -> void{}
 auto ofApp::mouseMoved(int x, int y ) -> void {}
 auto ofApp::mouseDragged(int x, int y, int button) -> void {}
-//auto ofApp::mousePressed(int x, int y, int button) -> void {}
 auto ofApp::mouseReleased(int x, int y, int button) -> void {}
 auto ofApp::windowResized(int w, int h) -> void {}
 auto ofApp::gotMessage(ofMessage msg) -> void {}
