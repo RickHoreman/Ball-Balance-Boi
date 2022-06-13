@@ -30,6 +30,7 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
+#include <numeric>
 
 
 #define MINTRACKAREA 50
@@ -39,7 +40,7 @@ auto ofApp::trackball() -> void {
     vector<cv::Vec3f> circles;
     HoughCircles(frame, circles, cv::HOUGH_GRADIENT, 1,
         1000,  // change this value to detect circles with different distances to each other
-        200, 20, 10, 75 // change the last two parameters
+        200, 20, 5, 75 // change the last two parameters
    // (min_radius & max_radius) to detect larger circles
     );
 
@@ -56,10 +57,10 @@ auto ofApp::trackball() -> void {
             //std::cout << i << ": " << center.x << ";" << center.y << "\n";
             if (state == appState::running) {
                 ballPos = { float(center.x), float(center.y) };
-                string output;
+                //string output;
                 for (int j{}; j < 3; j++) {
                     ballPosPerAxis[j] = (ballPos.x - centerPoint.x) * transMatrices[j].x + (ballPos.y - centerPoint.y) * transMatrices[j].y;
-                    output += std::format("{:.5f} {:.5f} ", ballPosPerAxis[j], setPointPerAxis[j]);
+                    //output += std::format("{:.5f} {:.5f} ", ballPosPerAxis[j], setPointPerAxis[j]);
                 }
                 //std::cout << output << std::endl;
                 pid();
@@ -70,20 +71,29 @@ auto ofApp::trackball() -> void {
 
 auto ofApp::pid() -> void {
     string output;
-    string dbg;
+    //string dbg;
     for (int i{}; i < 3; i++) {
         double error = setPointPerAxis[i] - ballPosPerAxis[i];
         iError[i] += error;
-        servoAction[i] = kp * error + ki * iError[i] + kd * (error - prevError[i]);
-        servoAction[i] = std::max(std::min(servoAction[i], 45.0), -10.0);
+        servoAction[i][servoActI] = kp * error + ki * iError[i] + kd * (error - prevError[i]);
+        servoAction[i][servoActI] = std::clamp(servoAction[i][servoActI], -10.0, 45.0);
+        double action;
+        if (error - prevError[i] < 1.75) {
+            action = reduce(servoAction[i].begin(), servoAction[i].end()) / servoAction[i].size();
+        } else {
+            action = servoAction[i][servoActI];
+        }
         prevError[i] = error;
-        output += std::format("{:.5f} ", servoAction[i] + 45.0);
-        dbg += std::format("{:.5f} {:.5f} {:.5f} ; ", kp * error, ki * iError[i], kd * (error - prevError[i]));
+        
+        output += std::format("{:.5f} ", action + 45.0);
+        //dbg += std::format("{:.5f} {:.5f} {:.5f} ; ", kp * error, ki * iError[i], kd * (error - prevError[i]));
     }
+    servoActI++;
+    servoActI %= servoAction[0].size();
     output += "\n";
     std::cout << output;
     //std::cout << dbg << std::endl;
-    serialcomm->write(output);
+    if (state == appState::running) { serialcomm->write(output); }
 }
 
 auto ofApp::setup() -> void {
@@ -144,7 +154,12 @@ auto ofApp::update() -> void {
 	camera->getFrame(camframe.get());
     frame.data = camframe.get();
 
+    updateSetPoint();
     trackball();
+
+    if (state == appState::calibration) {
+        serialcomm->write(std::format("{:.5f} {:.5f} {:.5f} \n", 45.0, 45.0, 45.0));
+    }
 }
 
 auto ofApp::draw() -> void {
@@ -291,15 +306,36 @@ auto ofApp::finishCalibration() -> void {
     genTransMatrix(1);
     genTransMatrix(2);
 
-    setSetPoint(640/2, 480/2);
+    setSetPoint(640 / 2, 480 / 2);
+    setSetPoint(640 / 2, 480 / 2);
 
     state = appState::running;
 }
 
 auto ofApp::setSetPoint(int x, int y) -> void {
-    setPoint = { float(x), float(y) };
+    startTime = ofGetCurrentTime();
+    oldSetPoint = setPoint;
+    newSetPoint = { float(x), float(y) };
+    ofPoint v = newSetPoint - oldSetPoint;
+    moveTimeSec = std::sqrt(std::pow(v.x, 2) + std::pow(v.y, 2)) / 150.f;
+}
+
+double cosineInterpolate(
+    double y1, double y2,
+    double mu)
+{
+    double mu2;
+
+    mu2 = (1 - cos(std::clamp(mu, 0.0, 1.0) * PI)) / 2;
+    return (y1 * (1 - mu2) + y2 * mu2);
+}
+
+auto ofApp::updateSetPoint() -> void {
+    double t = ofGetCurrentTime().getAsSeconds() - startTime.getAsSeconds();
+    t = t / moveTimeSec * 1.0;
+    setPoint = oldSetPoint * (1.f - cosineInterpolate(0.0, 1.0, t)) + newSetPoint * cosineInterpolate(0.0, 1.0, t);
     for (int i{}; i < 3; i++) {
-        setPointPerAxis[i] = (x - centerPoint.x) * transMatrices[i].x + (y - centerPoint.y) * transMatrices[i].y;
+        setPointPerAxis[i] = (setPoint.x - centerPoint.x) * transMatrices[i].x + (setPoint.y - centerPoint.y) * transMatrices[i].y;
     }
 }
 

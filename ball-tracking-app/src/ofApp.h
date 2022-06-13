@@ -58,6 +58,7 @@ public:
 	auto genTransMatrix(int i) -> void;
 	auto finishCalibration() -> void;
 	auto setSetPoint(int x, int y) -> void;
+	auto updateSetPoint() -> void;
 	auto reCalibrate() -> void;
 
 	auto keyPressed(int key) -> void override;
@@ -124,6 +125,10 @@ private:
 
 	ofPoint ballPos;
 	ofPoint setPoint;
+	ofPoint oldSetPoint;
+	ofPoint newSetPoint;
+	ofTime startTime;
+	double moveTimeSec = 1.f;
 	std::array<float, 3> ballPosPerAxis;
 	std::array<float, 3> setPointPerAxis;
 
@@ -135,7 +140,8 @@ private:
 	double kd = 7.f;
 	std::array<double, 3> prevError{0.f,0.f,0.f};
 	std::array<double, 3> iError{0.f,0.f,0.f};
-	std::array<double, 3> servoAction{ 0.f,0.f,0.f };
+	std::array<std::array<double, 5>, 3> servoAction{ 0.f,0.f,0.f };
+	int servoActI = 0;
 
 	template<typename T>
 	using access_ptr = T*;
