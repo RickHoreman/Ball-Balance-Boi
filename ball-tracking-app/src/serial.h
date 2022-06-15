@@ -10,9 +10,10 @@
  * @details ..
  */
 
-#ifndef COM_SERIAL_H
-#define COM_SERIAL_H
+#ifndef COMM_SERIAL_H
+#define COMM_SERIAL_H
 
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -21,6 +22,15 @@
  * @brief ..
  */
 namespace comm {
+
+/**
+ * @struct ..
+ * @brief ..
+ * @details ..
+ */
+struct serial_error : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
 
 /**
  * @interface ..

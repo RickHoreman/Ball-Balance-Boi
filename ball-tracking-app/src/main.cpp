@@ -10,13 +10,14 @@
  * @details ..
  */
 
-#include "ofApp.h"
+#include "application.h"
 #include "serial-win32.h"
 
 #include <ofMain.h>
 
 #include <cstdlib>
 #include <exception>
+#include <format>
 #include <iostream>
 
 /**
@@ -24,20 +25,17 @@
  * @return ..
  */
 auto main() -> int {
-	struct {
-		int width;
-		int height;
-	} constexpr screen{1920, 1080};
-	ofSetupOpenGL(screen.width, screen.height, OF_WINDOW);
-
 	try {
+		ofSetupOpenGL(1920, 1080, OF_WINDOW);
+		ofSetFrameRate(75);
+		ofDisableDataPath();
 		auto serial = comm::serial_win32{"COM6", 115'200};
-		ofRunApp(new ofApp{serial});
+		ofRunApp(new of::app{serial});
 		return EXIT_SUCCESS;
 	} catch (std::exception const& error) {
-		std::cerr << "unexpected exception occurred: " << error.what();
+		std::cerr << std::format("unexpected exception occurred: {}\n", error.what());
 	} catch (...) {
-		std::cerr << "unhandled exception occurred";
+		std::cerr << "unhandled exception occurred\n";
 	}
 	return EXIT_FAILURE;
 }

@@ -47,36 +47,10 @@ auto framestats::update() -> void {
  */
 auto getdevice(devlist::size_type device_id) -> devptr {
     auto const& devices = ps3cam::getDevices();
-    return device_id < devices.size()
-        ? devices[device_id]
-        : devptr{};
-}
-
-/**
- * @copydoc initcamera
- * @internal ..
- */
-auto initcamera(ps3cam& camera, config const& camcfg) -> status {
-    auto const is_initialized = camera.init(
-        camcfg.frame.width,
-        camcfg.frame.height,
-        camcfg.frame.rate,
-        camcfg.format);
-    if (not is_initialized) return status::init_failure;
-
-    camera.setRedBalance(camcfg.balance.red);
-    camera.setGreenBalance(camcfg.balance.green);
-    camera.setBlueBalance(camcfg.balance.blue);
-    camera.setAutoWhiteBalance(camcfg.balance.autowhite);   
-    camera.setExposure(camcfg.exposure);
-    camera.setSharpness(camcfg.sharpness);
-    camera.setBrightness(camcfg.brightness);
-    camera.setContrast(camcfg.contrast);
-    camera.setGain(camcfg.gain);
-    camera.setHue(camcfg.hue);
-    camera.setAutogain(camcfg.autogain);
-    camera.start();
-    return status::operational;
+    if (device_id >= devices.size()) {
+        throw camera_error{"could not find ps3 camera"};
+    }
+    return devices[device_id];
 }
 
 } // namespace cam

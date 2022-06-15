@@ -10,14 +10,17 @@
  * @details ..
  */
 
-#ifndef BBB_OPT_MENU_H
-#define BBB_OPT_MENU_H
+#ifndef OPT_MENU_H
+#define OPT_MENU_H
+
+#include "memory.h"
+#include "traits.h"
 
 #include <cctype>
+#include <concepts>
 #include <format>
 #include <functional>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 
@@ -31,169 +34,166 @@ namespace opt {
  * @class ..
  * @brief ..
  * @details ..
+ * @tparam ..
+ * @tparam ..
  */
-template<typename Accessor, typename Mutator>
-class dispatcher {
+template<typename ConfigItem, std::invocable<ConfigItem> Action>
+class menu_item {
 public:
     /**
      * @brief ..
      */
-    dispatcher(Accessor accessor, Mutator mutator):
-        accessor_{std::move(accessor)},
-        mutator_{std::move(mutator)}
-    {}
+    menu_item() = default;
+
+    /**
+     * @brief ..
+     * @details ..
+     * @param[in] .. ..
+     */
+    constexpr explicit menu_item(ConfigItem& cfgitem)
+        : value_{cfgitem} {}
+
+    /**
+     * @brief ..
+     * @details ..
+     * @param[in] .. ..
+     */
+    constexpr explicit menu_item(Action action)
+        : value_{std::move(action)} {}
+
+    /**
+     * @brief ..
+     * @details ..
+     * @param[in] .. ..
+     */
+    constexpr menu_item(ConfigItem& cfgitem, Action action)
+        : value_{cfgitem, std::move(action)} {}
+
+    /**
+     * @brief ..
+     * @details ..
+     * @return ..
+     * @{
+     */
+    [[nodiscard]]
+    constexpr auto& value() noexcept
+    { return value_; }
+
+    [[nodiscard]]
+    constexpr auto const& value() const noexcept
+    { return value_; }
+    /** @} */
 
     /**
      * @brief ..
      * @details ..
      * @return ..
      */
-    constexpr auto accessor() const noexcept -> Accessor const&
-    { return accessor_; }
-
-    /**
-     * @brief ..
-     * @details ..
-     * @return ..
-     */
-    constexpr auto mutator() const noexcept -> Mutator const&
-    { return mutator_; }
+    [[nodiscard]]
+    constexpr auto to_string() const -> std::string
+    { return std::format("{:16} {}\n", value().get().name(), value().get().to_string()); }
 
     /**
      * @brief ..
      */
-    friend auto operator==(dispatcher const&, dispatcher const&) -> bool = default;
+    [[nodiscard]]
+    friend auto operator==(menu_item const&, menu_item const&) -> bool = default;
 
 private:
-    Accessor accessor_;
-    Mutator mutator_;
-};
+    /**
+     * @struct ..
+     * @brief ..
+     * @details ..
+     */
+    class menu_value {
+    public:
+        /**
+         * @brief ..
+         */
+        menu_value() = default;
 
-/**
- * @struct ..
- * @brief ..
- * @details ..
- * @{
- */
-template<typename...>
-struct class_type_of;
+        /**
+         * @brief ..
+         * @details ..
+         * @param[in] .. ..
+         */
+        constexpr explicit menu_value(ConfigItem& cfgitem)
+            : cfgitem_{&cfgitem} {}
 
-template<typename Signature, typename Class>
-struct class_type_of<Signature Class::*> {
-    using class_type = Class;
-};
-/** @} */
+        /**
+         * @brief ..
+         * @details ..
+         * @param[in] .. ..
+         */
+        constexpr explicit menu_value(Action action)
+            : action_{std::move(action)} {}
 
-/**
- * @typedef ..
- * @brief ..
- */
-template<typename F>
-using class_type_of_t = typename class_type_of<F>::class_type;
+        /**
+         * @brief ..
+         * @details ..
+         * @param[in] .. ..
+         * @param[in] .. ..
+         */
+        constexpr menu_value(ConfigItem& cfgitem, Action action):
+            cfgitem_{&cfgitem},
+            action_{std::move(action)}
+        {}
 
-/**
- * @brief ..
- * @details ..
- * @tparam ..
- * @tparam ..
- * @tparam ..
- * @return ..
- * 
- * @todo require non-types to be pointer to member functions
- */
-template<auto Accessor, auto Mutator, typename Value = void>
-constexpr auto dispatch() noexcept {
-    using accessor_type = decltype(Accessor);
-    using class_type = class_type_of_t<accessor_type>;
-    using result_type = std::invoke_result_t<accessor_type, class_type>;
-    using value_type = std::conditional_t<
-        std::is_same_v<Value, void>, result_type, Value>;
-    return dispatcher{
-        +[](class_type const& object) -> value_type
-        { return std::invoke(Accessor, object); },
-        +[](class_type& object, value_type value)
-        { std::invoke(Mutator, object, value); }
+        /**
+         * @brief ..
+         * @details ..
+         * @return
+         */
+        constexpr auto apply() const -> decltype(auto)
+        { return std::invoke(action_, cfgitem_ == nullptr ? ConfigItem{} : *cfgitem_); }
+
+        /**
+         * @brief ..
+         * @details ..
+         * @tparam ..
+         * @param[in] .. ..
+         * @return ..
+         * 
+         * @todo add warning about possibly nullptr access_ptr
+         */
+        template<typename T>
+        constexpr auto apply(T&& value) -> void {
+            set(std::forward<T>(value));
+            if (not action_) return;
+            std::invoke(action_, *cfgitem_);
+        }
+
+        /**
+         * @brief ..
+         * @return ..
+         */
+        [[nodiscard]]
+        constexpr auto get() const noexcept -> ConfigItem const&
+        { return *cfgitem_; }
+
+        /**
+         * @brief ..
+         * @details ..
+         * @param[in] .. ..
+         */
+        template<typename T>
+        constexpr auto set(T&& value) noexcept -> void {
+            if (cfgitem_ == nullptr) return;
+            cfgitem_->value().set(std::forward<T>(value));
+        }
+
+        /**
+         * @brief ..
+         */
+        [[nodiscard]]
+        friend auto operator==(menu_value const&, menu_value const&) -> bool = default;
+
+    private:
+        mem::access_ptr<ConfigItem> cfgitem_{nullptr}; /**< .. */
+        Action action_;                                /**< .. */
     };
-}
 
-/**
- * @class ..
- * @brief ..
- * @details ..
- * @tparam ..
- * @tparam ..
- * 
- * @todo require types to be invocable
- */
-template<typename Accessor, typename Mutator>
-class option {
-    /**
-     * @typedef ..
-     * @brief ..
-     */
-    using dispatcher_type = dispatcher<Accessor, Mutator>;
-
-public:
-    /**
-     * @brief ..
-     */
-    option() = default;
-
-    /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
-     * @param[in] .. ..
-     * @param[in] .. ..
-     */
-    constexpr option(std::string name, dispatcher_type dispatcher_obj):
-        name_{std::move(name)},
-        dispatcher_{std::move(dispatcher_obj)}
-    {}
-
-    /**
-     * @brief ..
-     * @details ..
-     * @tparam ..
-     * @param[in] .. ..
-     * @return ..
-     */
-    template<typename... Ts>
-    constexpr auto getvalue(Ts&&... args) const noexcept -> decltype(auto)
-    { return std::invoke(dispatcher_.accessor(), std::forward<Ts>(args)...); }
-
-    /**
-     * @brief ..
-     * @details ..
-     * @tparam ..
-     * @param[in] .. ..
-     * @return ..
-     */
-    template<typename... Ts>
-    constexpr auto setvalue(Ts&&... args) const noexcept -> void
-    { return std::invoke(dispatcher_.mutator(), std::forward<Ts>(args)...); }
-
-    /**
-     * @brief ..
-     * @details ..
-     * @tparam ..
-     * @param[in] .. ..
-     * @return ..
-     */
-    template<typename... Ts>
-    constexpr auto to_string(Ts&&... args) const -> std::string {
-        return std::format("{:16} {:3}\n",
-            name_ + ':', getvalue(std::forward<Ts>(args)...));
-    }
-
-    /**
-     * @brief ..
-     */
-    friend auto operator==(option const&, option const&) -> bool = default;
-
-private:
-    std::string name_;           /**< .. */
-    dispatcher_type dispatcher_; /**< .. */
+    menu_value value_; /**< .. */
 };
 
 /**
@@ -201,26 +201,37 @@ private:
  * @brief ..
  * @details ..
  * @tparam ..
- * 
- * @todo require types to be invocable
+ * @tparam ..
  */
-template<typename... Dispatchers>
+template<typename ConfigItem, std::invocable<ConfigItem> Action>
 class menu {
     /**
      * @typedef ..
      * @brief ..
      */
-    using option_type = option<Dispatchers...>;
+    using item_type = menu_item<ConfigItem, Action>;
 
 public:
+    /**
+     * @brief ..
+     * @details ..
+     * @tparam ..
+     * @param[in] .. ..
+     * @param[in] .. ..
+     */
+    template<typename... Ts>
+    constexpr auto add(unsigned char key, Ts&&... args) -> void
+    { items.try_emplace(key, std::forward<Ts>(args)...); }
+
     /**
      * @brief ..
      * @details ..
      * @param[in] .. ..
      * @return ..
      */
+    [[nodiscard]]
     constexpr auto contains(unsigned char key) const noexcept -> bool
-    { return options.contains(key); }
+    { return items.contains(key); }
 
     /**
      * @brief ..
@@ -236,19 +247,9 @@ public:
      * @param[in] .. ..
      * @return ..
      */
-    constexpr auto selection() const -> option_type const&
-    { return options.at(selection_); }
-
-    /**
-     * @brief ..
-     * @details ..
-     * @tparam ..
-     * @param[in] .. ..
-     * @param[in] .. ..
-     */
-    template<typename... Ts>
-    constexpr auto add(unsigned char key, Ts&&... args) -> void
-    { options.try_emplace(key, std::forward<Ts>(args)...); }
+    [[nodiscard]]
+    constexpr auto selection() -> item_type&
+    { return items.at(selection_); }
 
     /**
      * @brief ..
@@ -257,16 +258,15 @@ public:
      * @param[in] .. ..
      * @return ..
      */
-    template<typename... Ts>
-    constexpr auto to_string(Ts&&... args) const -> std::string {
+    [[nodiscard]]
+    constexpr auto to_string() const -> std::string {
         auto result = std::string{};
-        auto const max_option_name = 24;
-        result.reserve(max_option_name * options.size());
+        auto const max_item_name = 32;
+        result.reserve(max_item_name * items.size());
 
-        for (auto const& [key, option] : options) {
-            auto const upperkey = static_cast<char>(std::toupper(key));
-            result += std::format("{} - {}", upperkey,
-                option.to_string(std::forward<Ts>(args)...));
+        for (auto const& [key, item] : items) {
+            result += std::format("{:c} / {}",
+                std::toupper(key), item.to_string());
         }
         return result;
     }
@@ -274,16 +274,13 @@ public:
     /**
      * @brief ..
      */
+    [[nodiscard]]
     friend auto operator==(menu const&, menu const&) -> bool = default;
 
 private:
-    /**
-     * @typedef ..
-     * @brief ..
-     */
-    using map_type = std::unordered_map<unsigned char, option_type>;
+    using map_type = std::unordered_map<unsigned char, item_type>; /**< .. */
 
-    map_type options;           /**< .. */
+    map_type items;             /**< .. */
     unsigned char selection_{}; /**< .. */
 };
 
