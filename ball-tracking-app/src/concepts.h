@@ -13,8 +13,6 @@
 #ifndef CC_CONCEPTS_H
 #define CC_CONCEPTS_H
 
-#include "traits.h"
-
 #include <concepts>
 
 /**
@@ -31,6 +29,6 @@ namespace cc {
 template<typename T>
 concept arithmetic = std::integral<T> or std::floating_point<T>;
 
-} // namespace con
+} // namespace cc
 
 #endif
