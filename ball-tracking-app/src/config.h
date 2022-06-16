@@ -408,7 +408,7 @@ struct visioncfg {
     [[nodiscard]]
     friend auto operator==(visioncfg const&, visioncfg const&) -> bool = default;
 
-    cfgitem<> trackball; /**< .. */
+    cfgitem<> trackball;     /**< .. */
     cfgitem<> minballradius; /**< .. */
     cfgitem<> maxballradius; /**< .. */
 };

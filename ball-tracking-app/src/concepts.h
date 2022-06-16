@@ -27,33 +27,6 @@ namespace cc {
  * @brief ..
  * @details ..
  * @tparam ..
- * @tparam ..
- */
-template<typename T, typename... Ts>
-concept same_as_all = ts::is_same_all_v<T, Ts...>;
-
-/**
- * @brief ..
- * @details ..
- * @tparam ..
- * @tparam ..
- */
-template<typename T, typename... Ts>
-concept same_as_any = ts::is_same_any_v<T, Ts...>;
-
-/**
- * @brief ..
- * @details ..
- * @tparam ..
- * @tparam ..
- */
-template<typename T, typename... Ts>
-concept same_as_none = ts::is_same_none_v<T, Ts...>;
-
-/**
- * @brief ..
- * @details ..
- * @tparam ..
  */
 template<typename T>
 concept arithmetic = std::integral<T> or std::floating_point<T>;
