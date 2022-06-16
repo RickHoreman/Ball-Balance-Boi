@@ -25,22 +25,22 @@
  * @return ..
  */
 auto main() -> int {
-	try {
-		ofDisableDataPath();
-		auto appcfg = cfg::config::defaults();
-		appcfg.loadxml();
-		ofSetupOpenGL(appcfg.screen.width, appcfg.screen.height, OF_WINDOW);
-		ofSetFrameRate(appcfg.screen.rate);
-		auto serial = comm::serial_win32{
-			std::format("COM{}", appcfg.serial.comport),
-			appcfg.serial.baudrate.to<long>()};
-		ofRunApp(new of::app{appcfg, serial});
-		appcfg.savexml();
-		return EXIT_SUCCESS;
-	} catch (std::exception const& error) {
-		std::cerr << std::format("unexpected exception occurred: {}\n", error.what());
-	} catch (...) {
-		std::cerr << "unhandled exception occurred\n";
-	}
-	return EXIT_FAILURE;
+    try {
+        ofDisableDataPath();
+        auto appcfg = cfg::config::defaults();
+        appcfg.loadxml();
+        ofSetupOpenGL(appcfg.screen.width, appcfg.screen.height, OF_WINDOW);
+        ofSetFrameRate(appcfg.screen.rate);
+        auto serial = comm::serial_win32{
+            std::format("COM{}", appcfg.serial.comport),
+            appcfg.serial.baudrate.to<long>()};
+        ofRunApp(new of::app{appcfg, serial});
+        appcfg.savexml();
+        return EXIT_SUCCESS;
+    } catch (std::exception const& error) {
+        std::cerr << std::format("unexpected exception occurred: {}\n", error.what());
+    } catch (...) {
+        std::cerr << "unhandled exception occurred\n";
+    }
+    return EXIT_FAILURE;
 }
