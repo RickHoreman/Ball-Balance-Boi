@@ -10,36 +10,37 @@
  * @details ..
  */
 
-#include "ofApp.h"
+#include "application.h"
 #include "serial-win32.h"
 
 #include <ofMain.h>
 
 #include <cstdlib>
 #include <exception>
+#include <format>
 #include <iostream>
 
- /**
-  * @brief ..
-  * @return ..
-  */
+/**
+ * @brief ..
+ * @return ..
+ */
 auto main() -> int {
-	struct {
-		int width;
-		int height;
-	} constexpr screen{ 1920, 1080 };
-	ofSetupOpenGL(screen.width, screen.height, OF_WINDOW);
-
 	try {
-		auto serial = comm::serial_win32{ "COM3", 115'200 };
-		ofRunApp(new ofApp{ serial });
+		ofDisableDataPath();
+		auto appcfg = cfg::config::defaults();
+		appcfg.loadxml();
+		ofSetupOpenGL(appcfg.screen.width, appcfg.screen.height, OF_WINDOW);
+		ofSetFrameRate(appcfg.screen.rate);
+		auto serial = comm::serial_win32{
+			std::format("COM{}", appcfg.serial.comport),
+			appcfg.serial.baudrate.to<long>()};
+		ofRunApp(new of::app{appcfg, serial});
+		appcfg.savexml();
 		return EXIT_SUCCESS;
-	}
-	catch (std::exception const& error) {
-		std::cerr << "unexpected exception occurred: " << error.what();
-	}
-	catch (...) {
-		std::cerr << "unhandled exception occurred";
+	} catch (std::exception const& error) {
+		std::cerr << std::format("unexpected exception occurred: {}\n", error.what());
+	} catch (...) {
+		std::cerr << "unhandled exception occurred\n";
 	}
 	return EXIT_FAILURE;
 }

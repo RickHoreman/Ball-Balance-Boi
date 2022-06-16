@@ -31,13 +31,10 @@ auto framestats::update() -> void {
     ++count;
 
     auto const time = ofGetElapsedTimeMillis();
-    if (time < (samplecount + decltype(time){1000})) return;
+    if (time < (sampletime + decltype(time){1'000})) return;
 
-    auto const countdiff = count - samplecount;
-    fps_ = countdiff / ((time - sampletime) * 0.001f);
-
+    fps_ = count / ((time - sampletime) * 0.001f);
     sampletime = time;
-    samplecount = countdiff;
     count = 0;
 }
 
@@ -46,37 +43,11 @@ auto framestats::update() -> void {
  * @internal ..
  */
 auto getdevice(devlist::size_type device_id) -> devptr {
-    auto const& devices{ps3cam::getDevices()};
-    return device_id < devices.size()
-        ? devices[device_id]
-        : devptr{};
-}
-
-/**
- * @copydoc initcamera
- * @internal ..
- */
-auto initcamera(ps3cam& camera, config const& camcfg) -> status {
-    auto const is_initialized = camera.init(
-        camcfg.frame.width,
-        camcfg.frame.height,
-        camcfg.frame.rate,
-        camcfg.format);
-    if (not is_initialized) return status::init_failure;
-
-    camera.setRedBalance(camcfg.balance.red);
-    camera.setGreenBalance(camcfg.balance.green);
-    camera.setBlueBalance(camcfg.balance.blue);
-    camera.setAutoWhiteBalance(camcfg.balance.autowhite);   
-    camera.setSharpness(camcfg.sharpness);
-    camera.setExposure(camcfg.exposure);
-    camera.setBrightness(camcfg.brightness);
-    camera.setContrast(camcfg.contrast);
-    camera.setGain(camcfg.gain);
-    camera.setHue(camcfg.hue);
-    camera.setAutogain(camcfg.autogain);
-    camera.start();
-    return status::operational;
+    auto const& devices = ps3cam::getDevices();
+    if (device_id >= devices.size()) {
+        throw camera_error{"could not find ps3 camera"};
+    }
+    return devices[device_id];
 }
 
 } // namespace cam

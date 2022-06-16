@@ -10,12 +10,13 @@
  * @details ..
  */
 
-#ifndef BBB_CAM_CAMERA_H
-#define BBB_CAM_CAMERA_H
+#ifndef CAM_CAMERA_H
+#define CAM_CAMERA_H
 
 #include "ps3eye.h"
+#include "types.h"
 
-#include <cstdint>
+#include <stdexcept>
 #include <type_traits>
 
 /**
@@ -44,12 +45,18 @@ using devlist = std::remove_reference_t<
     decltype(ps3cam::getDevices())>;
 
 /**
- * @enum status
+ * @typedef format
  * @brief ..
  */
-enum class status {
-    operational,  /**< .. */
-    init_failure  /**< .. */
+using format = ps3cam::EOutputFormat;
+
+/**
+ * @struct ..
+ * @brief ..
+ * @details ..
+ */
+struct camera_error : std::runtime_error {
+    using std::runtime_error::runtime_error;
 };
 
 /**
@@ -61,11 +68,6 @@ class framestats {
 public:
     /**
      * @brief ..
-     */
-    framestats() = default;
-
-    /**
-     * @brief ..
      * @details ..
      */
     auto update() -> void;
@@ -75,115 +77,21 @@ public:
      * @details ..
      * @return ..
      */
+    [[nodiscard]]
     constexpr auto fps() const noexcept -> float
     { return fps_; }
 
     /**
      * @brief ..
      */
-    friend auto operator<=>(framestats const&, framestats const&) = default;
+    [[nodiscard]]
+    friend auto operator==(framestats const&, framestats const&) -> bool = default;
 
 private:
-    std::uint64_t sampletime{};   /**< .. */
-    std::uint16_t samplecount{};  /**< .. */
-    std::uint16_t count{};        /**< .. */
-    float fps_{};                 /**< .. */
-};
-
-/**
- * @namespace ..
- * @brief ..
- */
-namespace cfg {
-
-/**
-* @typedef format
-* @brief ..
-*/
-using format = ps3cam::EOutputFormat;
-
-/**
- * @struct frame
- * @brief ..
- */
-struct frame {
-    /**
-     * @brief ..
-     * @details ..
-     * @param[in] depth ..
-     * @return ..
-     */
-    constexpr auto size(unsigned depth = 1) const noexcept -> unsigned
-    { return depth * width * height; }
-
-    /**
-     * @brief ..
-     */
-    friend auto operator<=>(frame const&, frame const&) = default;
-
-    std::uint16_t width;   /**< .. */
-    std::uint16_t height;  /**< .. */
-    std::uint16_t rate;    /**< .. */
-};
-
-/**
- * @struct ..
- * @brief ..
- * @details ..
- */
-struct balance {
-    /**
-     * @brief ..
-     */
-    friend auto operator<=>(balance const&, balance const&) = default;
-
-    std::uint8_t red;    /**< .. */
-    std::uint8_t green;  /**< .. */
-    std::uint8_t blue;   /**< .. */
-    bool autowhite;      /**< .. */
-};
-
-} // namespace cfg
-
-/**
- * @struct config
- * @brief ..
- */
-struct config {
-    /**
-     * @brief ..
-     * @return ..
-     */
-    static constexpr auto defaults() noexcept -> config {
-        return {
-            .format{cfg::format::Gray},
-            .frame{.width{640},.height{480},.rate{75}},
-            .balance{.red{128},.green{128},.blue{128},.autowhite{false}},
-            .sharpness{0},
-            .exposure{30},
-            .brightness{150},
-            .contrast{150},
-            .gain{20},
-            .hue{143},
-            .autogain{false}
-        };
-    }
-
-    /**
-     * @brief ..
-     */
-    friend auto operator<=>(config const&, config const&) = default;
-
-    cfg::format format;       /**< .. */
-    cfg::frame frame;         /**< .. ? */
-    cfg::balance balance;     /**< .. ? */
-    std::uint8_t sharpness;   /**< .. */
-    std::uint8_t exposure;    /**< .. */
-    std::uint8_t brightness;  /**< .. */
-    std::uint8_t contrast;    /**< .. */
-    std::uint8_t gain;        /**< .. */
-    std::uint8_t hue;         /**< .. */
-    bool autogain;            /**< .. */
+    uint64 sampletime{};   /**< .. */
+    uint16 samplecount{};  /**< .. */
+    uint16 count{};        /**< .. */
+    float fps_{};          /**< .. */
 };
 
 /**
@@ -192,16 +100,40 @@ struct config {
  * @param[in] device_id ..
  * @return ..
  */
+[[nodiscard]]
 auto getdevice(devlist::size_type device_id = 0) -> devptr;
 
 /**
  * @brief ..
  * @details ..
+ * @tparam ..
  * @param[in] camera ..
  * @param[in] camcfg ..
  * @return ..
  */
-auto initcamera(ps3cam& camera, config const& camcfg) -> status;
+auto initcamera(ps3cam& camera, auto const& camcfg) -> void {
+    auto const is_initialized = camera.init(
+        camcfg.frame.width,
+        camcfg.frame.height,
+        camcfg.frame.rate,
+        static_cast<format>(static_cast<int>(camcfg.format))
+    );
+    if (not is_initialized) {
+        throw camera_error{"could not initialize ps3 camera"};
+    }
+    camera.setRedBalance(camcfg.balance.red);
+    camera.setGreenBalance(camcfg.balance.green);
+    camera.setBlueBalance(camcfg.balance.blue);
+    camera.setAutoWhiteBalance(camcfg.balance.autowhite);   
+    camera.setExposure(camcfg.exposure);
+    camera.setSharpness(camcfg.sharpness);
+    camera.setBrightness(camcfg.brightness);
+    camera.setContrast(camcfg.contrast);
+    camera.setGain(camcfg.gain);
+    camera.setHue(camcfg.hue);
+    camera.setAutogain(camcfg.autogain);
+    camera.start();
+}
 
 } // namespace cam
 
