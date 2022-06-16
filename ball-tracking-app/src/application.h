@@ -208,11 +208,11 @@ private:
     cam::devptr camera;                /**< .. */
     cam::framestats camstats;          /**< .. */
     std::unique_ptr<uint8[]> camframe; /**< .. */
-    cv::Mat frame;                       /**< .. */
+    cv::Mat frame;                     /**< .. */
     cv::Point ballpos;                 /**< .. */
 
     keyinput inputmode{};    /**< .. */
-    menu_type cfgmenu;         /**< .. */
+    menu_type cfgmenu;       /**< .. */
     std::string inputvalue;  /**< .. */
     std::string valueprompt; /**< .. */
     std::string menuprompt;  /**< .. */
@@ -226,10 +226,9 @@ private:
     std::array<ofPoint, 3> transMatricesPreScale; /**< .. */
     std::array<ofPoint, 3> transMatrices;         /**< .. */
 
-    ofPoint targetCenter; /**< .. */
     float targetScale;    /**< .. */
-
-    ofPoint centerPoint; /**< .. */
+    ofPoint targetCenter; /**< .. */
+    ofPoint centerPoint;  /**< .. */
 
     ofPoint ballPos;          /**< .. */
     ofPoint setPoint;         /**< .. */
