@@ -1,3 +1,10 @@
+*.exe
+*.obj
+.vscode
+ball-tracking-app/bin
+ball-tracking-app/obj
+ball-tracking-app/.vs
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
