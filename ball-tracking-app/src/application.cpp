@@ -380,10 +380,10 @@ auto app::finishCalibration() -> void {
 /**
  * @copydoc app::genTransMatrix
  */
-auto app::genTransMatrix(int i) -> void {
+auto app::genTransMatrix(int axis) -> void {
     ofPoint vTrans{0, 1};
     ofPoint center = centerPoint;
-    ofPoint v = calibrationPoints[i] - center;
+    ofPoint v = calibrationPoints[axis] - center;
 
     float mV = std::sqrt(std::pow(v.x, 2) + std::pow(v.y, 2));
     float rTrans = std::atan((v.y) / (v.x)) - std::atan(vTrans.y / vTrans.x);
@@ -392,8 +392,8 @@ auto app::genTransMatrix(int i) -> void {
     }
     vTrans = {std::cos(rTrans) * vTrans.x - std::sin(rTrans) * vTrans.y,
         std::sin(rTrans) * vTrans.x + std::cos(rTrans) * vTrans.y};
-    transMatricesPreScale[i] = vTrans;
-    transMatrices[i] = vTrans / mV * targetScale;
+    transMatricesPreScale[axis] = vTrans;
+    transMatrices[axis] = vTrans / mV * targetScale;
 };
 
 /**
