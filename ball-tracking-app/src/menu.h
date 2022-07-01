@@ -6,282 +6,195 @@
  * @author     Rick Horeman
  * @copyright  GPL-3.0 license
  *
- * @brief ..
- * @details ..
+ * @brief Menu interface.
  */
 
-#ifndef OPT_MENU_H
-#define OPT_MENU_H
+#ifndef UI_MENU_H
+#define UI_MENU_H
 
-#include "memory.h"
-#include "traits.h"
+#include "concepts.h"
+#include "utility.h"
 
+#include <algorithm>
 #include <cctype>
 #include <concepts>
 #include <format>
 #include <functional>
+#include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
+#include <vector>
 
 /**
- * @namespace ..
- * @brief ..
+ * @namespace ui
+ * @brief User interface related components.
  */
-namespace opt {
+namespace ui {
 
 /**
- * @class ..
- * @brief ..
- * @details ..
- * @tparam ..
- * @tparam ..
+ * @class menu_option
+ * @brief Menu option.
+ * @details Maps a key to a configurable item and an optional action.
+ * @tparam ConfigItem Configuration item type, required to be configurable.
+ * @tparam Action Action type, required to be invocable without parameters.
  */
-template<typename ConfigItem, std::invocable<ConfigItem> Action>
-class menu_item {
+template<cc::configurable ConfigItem, std::invocable Action>
+class menu_option {
 public:
     /**
-     * @brief ..
+     * @brief Default constructs a menu option.
      */
-    menu_item() = default;
+    menu_option() = default;
 
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
+     * @brief Constructs a menu option with the given key, configuration item, and
+     *     optional action.
+     * @param[in] key Key to uniquely identify a menu option.
+     * @param[in] cfgitem Existing configuration item to set when applying a menu option.
+     * @param[in] action Optional action to invoke when applying a menu option. Defaulted
+     *     to an empty action.
      */
-    constexpr explicit menu_item(ConfigItem& cfgitem)
-        : value_{cfgitem} {}
+    constexpr menu_option(
+        unsigned char key,
+        ConfigItem& cfgitem,
+        Action action = {}
+    ):
+        key_{key},
+        action_{std::move(action)},
+        cfgitem_{std::addressof(cfgitem)}
+    {}
 
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
+     * @brief Applies a menu option with the given value.
+     * @details Sets the configuration item with the given value and invokes the stored
+     *     action if not empty.
+     * @tparam Value Type of the value.
+     * @param[in] value Value to set the configuration item with.
      */
-    constexpr explicit menu_item(Action action)
-        : value_{std::move(action)} {}
+    template<typename Value>
+    constexpr auto apply(Value&& value) -> void {
+        cfgitem_->set(std::forward<Value>(value));
+        if (not action_) return;
+        std::invoke(std::forward<Action>(action_));
+    }
 
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
+     * @brief Returns a string representation of a menu option.
+     * @details Contains the name and value of the configuration item.
+     * @tparam String Representation type, required to be a std::string.
+     * @remark The type-constraint is there for future specializations.
      */
-    constexpr menu_item(ConfigItem& cfgitem, Action action)
-        : value_{cfgitem, std::move(action)} {}
+    template<std::same_as<std::string> String>
+    [[nodiscard]]
+    constexpr auto to() const -> String {
+        return std::format("{:20} {:>16}\n",
+            cfgitem_->name(), cfgitem_->to<std::string>());
+    }
 
     /**
-     * @brief ..
-     * @details ..
-     * @return ..
-     * @{
+     * @brief Returns the key of the menu option.
      */
     [[nodiscard]]
-    constexpr auto& value() noexcept
-    { return value_; }
-
-    [[nodiscard]]
-    constexpr auto const& value() const noexcept
-    { return value_; }
-    /** @} */
+    constexpr auto key() const noexcept -> unsigned char
+    { return key_; }
 
     /**
-     * @brief ..
-     * @details ..
-     * @return ..
+     * @brief Menu options are considered to be equal when their keys match.
      */
     [[nodiscard]]
-    constexpr auto to_string() const -> std::string
-    { return std::format("{:20} {}\n", value().get().name(), value().get().to_string()); }
-
-    /**
-     * @brief ..
-     */
-    [[nodiscard]]
-    friend auto operator==(menu_item const&, menu_item const&) -> bool = default;
+    friend constexpr auto operator==(
+        menu_option const& lhs, menu_option const& rhs) noexcept -> bool
+    { return lhs.key() == rhs.key(); }
 
 private:
-    /**
-     * @struct ..
-     * @brief ..
-     * @details ..
-     */
-    class menu_value {
-    public:
-        /**
-         * @brief ..
-         */
-        menu_value() = default;
-
-        /**
-         * @brief ..
-         * @details ..
-         * @param[in] .. ..
-         */
-        constexpr explicit menu_value(ConfigItem& cfgitem)
-            : cfgitem_{&cfgitem} {}
-
-        /**
-         * @brief ..
-         * @details ..
-         * @param[in] .. ..
-         */
-        constexpr explicit menu_value(Action action)
-            : action_{std::move(action)} {}
-
-        /**
-         * @brief ..
-         * @details ..
-         * @param[in] .. ..
-         * @param[in] .. ..
-         */
-        constexpr menu_value(ConfigItem& cfgitem, Action action):
-            cfgitem_{&cfgitem},
-            action_{std::move(action)}
-        {}
-
-        /**
-         * @brief ..
-         * @details ..
-         * @return
-         */
-        constexpr auto apply() const -> decltype(auto)
-        { return std::invoke(action_, cfgitem_ == nullptr ? ConfigItem{} : *cfgitem_); }
-
-        /**
-         * @brief ..
-         * @details ..
-         * @tparam ..
-         * @param[in] .. ..
-         * @return ..
-         */
-        template<typename T>
-        constexpr auto apply(T&& value) -> void {
-            set(std::forward<T>(value));
-            if (not action_) return;
-            std::invoke(action_, *cfgitem_);
-        }
-
-        /**
-         * @brief ..
-         * @return ..
-         */
-        [[nodiscard]]
-        constexpr auto get() const noexcept -> ConfigItem const&
-        { return *cfgitem_; }
-
-        /**
-         * @brief ..
-         * @details ..
-         * @param[in] .. ..
-         */
-        template<typename T>
-        constexpr auto set(T&& value) noexcept -> void {
-            if (cfgitem_ == nullptr) return;
-            cfgitem_->value().set(std::forward<T>(value));
-        }
-
-        /**
-         * @brief ..
-         */
-        [[nodiscard]]
-        friend auto operator==(menu_value const&, menu_value const&) -> bool = default;
-
-    private:
-        mem::access_ptr<ConfigItem> cfgitem_{nullptr}; /**< .. */
-        Action action_;                                /**< .. */
-    };
-
-    menu_value value_; /**< .. */
+    Action action_;                        /**< Optional menu action. */
+    util::access_ptr<ConfigItem> cfgitem_; /**< Configuration item. */
+    unsigned char key_;                    /**< Key to uniquely identify a menu option. */
 };
 
 /**
- * @class ..
- * @brief ..
- * @details ..
- * @tparam ..
- * @tparam ..
+ * @class menu
+ * @brief Menu.
+ * @details Consists of a set of menu options and holds a menu selection.
+ * @tparam ConfigItem Configuration item type, required to be configurable.
+ * @tparam Action Action type, required to be invocable without parameters.
  */
-template<typename ConfigItem, std::invocable<ConfigItem> Action>
+template<cc::configurable ConfigItem, std::invocable Action>
 class menu {
-    /**
-     * @typedef ..
-     * @brief ..
-     */
-    using item_type = menu_item<ConfigItem, Action>;
+    using option_type = menu_option<ConfigItem, Action>; /**< Menu option object. */
 
 public:
     /**
-     * @brief ..
-     * @details ..
-     * @tparam ..
-     * @param[in] .. ..
-     * @param[in] .. ..
+     * @brief Adds a menu option to the menu.
+     * @post Invalidates the current menu selection when a reallocation is required.
+     * @tparam Ts Optional argument types.
+     * @param[in] key Key to uniquely identify a menu option.
+     * @param[in] args Optional arguments to construct a menu option with.
      */
     template<typename... Ts>
     constexpr auto add(unsigned char key, Ts&&... args) -> void
-    { items.try_emplace(key, std::forward<Ts>(args)...); }
+    { options_.emplace_back(key, std::forward<Ts>(args)...); }
 
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
-     * @return ..
+     * @brief Removes a menu option from the menu.
+     * @pre Ensure the current menu selection is valid before calling this function.
+     */
+    constexpr auto remove() -> void
+    { options_.erase(selection); }
+
+    /**
+     * @brief Selects a menu option with the given key.
+     * @param[in] key Key of the menu option to select.
+     * @return If the menu option was found, returns true. Otherwise, returns false.
+     */
+    constexpr auto select(unsigned char key) noexcept -> bool {
+        selection_ = std::ranges::find_if(options_,
+            [key](auto const& option){ return option.key() == key; });
+        return selection_ != options_.end();
+    }
+
+    /**
+     * @brief Returns a reference to the selected menu option.
+     * @pre Ensure the current menu selection is valid before calling this function.
      */
     [[nodiscard]]
-    constexpr auto contains(unsigned char key) const noexcept -> bool
-    { return items.contains(key); }
+    constexpr auto selection() const noexcept -> option_type&
+    { return *selection_; }
 
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
+     * @brief Returns a string representation of a menu.
+     * @details Contains the string representation of all menu options.
+     * @tparam String Representation type, required to be a std::string.
+     * @remark The type-constraint is there for future specializations.
      */
-    constexpr auto select(unsigned char key) noexcept -> void
-    { selection_ = key; }
-
-    /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
-     * @return ..
-     */
+    template<std::same_as<std::string> String>
     [[nodiscard]]
-    constexpr auto selection() -> item_type&
-    { return items.at(selection_); }
+    constexpr auto to() const -> String {
+        auto result = String{};
+        auto const max_option_name = 32;
+        result.reserve(max_option_name * options_.size());
 
-    /**
-     * @brief ..
-     * @details ..
-     * @tparam ..
-     * @param[in] .. ..
-     * @return ..
-     */
-    [[nodiscard]]
-    constexpr auto to_string() const -> std::string {
-        auto result = std::string{};
-        auto const max_item_name = 32;
-        result.reserve(max_item_name * items.size());
-
-        for (auto const& [key, item] : items) {
+        for (auto const& option : options_) {
             result += std::format("{:c} | {}",
-                std::toupper(key), item.to_string());
+                std::toupper(option.key()), option.to<String>());
         }
         return result;
     }
 
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(menu const&, menu const&) -> bool = default;
 
 private:
-    using map_type = std::unordered_map<unsigned char, item_type>; /**< .. */
+    using storage_type = std::vector<option_type>; /**< Menu options container type. */
+    using selection_type = storage_type::iterator; /**< Menu selection type. */
 
-    map_type items;             /**< .. */
-    unsigned char selection_{}; /**< .. */
+    storage_type options_;     /**< Menu options. */
+    selection_type selection_; /**< Menu selection. */
 };
 
-} // namespace opt
+} // namespace ui
 
 #endif

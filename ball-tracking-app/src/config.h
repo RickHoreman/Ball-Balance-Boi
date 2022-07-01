@@ -6,8 +6,7 @@
  * @author     Rick Horeman
  * @copyright  GPL-3.0 license
  *
- * @brief ..
- * @details ..
+ * @brief Configuration settings of the ball-tracking application.
  */
 
 #ifndef CFG_CONFIG_H
@@ -22,474 +21,310 @@
 
 #include <algorithm>
 #include <charconv>
+#include <concepts>
 #include <format>
 #include <string>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
+#include <utility>
+#include <variant>
 
- /**
-  * @namespace ..
-  * @brief ..
-  */
+/**
+ * @namespace cfg
+ * @brief Configuration related components.
+ */
 namespace cfg {
 
 /**
- * @enum ..
- * @brief ..
- * @details ..
+ * @class config_item
+ * @brief Configuration item.
+ * @details Maps an arithmetic value to a named setting.
+ * @tparam Values One or more arithmetic types, requried to be distinct.
  */
-enum class dtype : uint8 {
-    boolean, /**< .. */
-    uint8,   /**< .. */
-    uint16,  /**< .. */
-    int32,   /**< .. */
-    fraction /**< .. */
-};
-
-/**
- * @brief ..
- * @details ..
- * @tparam
- */
-template<typename>
-struct dtype_from;
-
-template<>
-struct dtype_from<bool>
-    : std::integral_constant<dtype, dtype::boolean> {};
-
-template<>
-struct dtype_from<uint8>
-    : std::integral_constant<dtype, dtype::uint8> {};
-
-template<>
-struct dtype_from<uint16>
-    : std::integral_constant<dtype, dtype::uint16> {};
-
-template<>
-struct dtype_from<int32>
-    : std::integral_constant<dtype, dtype::int32> {};
-
-template<>
-struct dtype_from<double>
-    : std::integral_constant<dtype, dtype::fraction> {};
-/** @} */
-
-/**
- * @brief ..
- * @details ..
- * @tparam ..
- */
-template<dtype>
-struct typename_from;
-
-template<>
-struct typename_from<dtype::boolean>
-    : std::type_identity<bool> {};
-
-template<>
-struct typename_from<dtype::uint8>
-    : std::type_identity<uint8> {};
-
-template<>
-struct typename_from<dtype::uint16>
-    : std::type_identity<uint16> {};
-
-template<>
-struct typename_from<dtype::int32>
-    : std::type_identity<int32> {};
-
-template<>
-struct typename_from<dtype::fraction>
-    : std::type_identity<double> {};
-/** @} */
-
-/**
- * @class ..
- * @brief ..
- * @details ..
- * @tparam ..
- */
-template<typename Value>
-    requires cc::arithmetic<Value>
+template<cc::arithmetic... Values>
+    requires cc::distinct<Values...>
 class config_item {
 public:
     /**
-     * @brief ..
+     * @brief Default constructs a configuration item.
      */
     config_item() = default;
 
     /**
-     * @brief ..
-     * @details ..
-     * @tparam ..
-     * @param[in] .. ..
-     * @param[in] .. ..
+     * @brief Constructs a configuration item with the given name and optional value.
+     * @tparam Value Value-type of the value to be stored.
+     * @param[in] name Name of the configuration item.
+     * @param[in] value Initial value of the configuration item. Value-initializes the
+     *     first value-type by default.
      */
-    template<typename T>
-        requires cc::arithmetic<T> or std::is_enum_v<T>
-    constexpr config_item(std::string name, dtype type, T value = {}):
+    template<cc::convertible_to_any<Values...> Value>
+    constexpr explicit config_item(std::string name, Value value = {}):
         name_{std::move(name)},
-        value_{type, static_cast<Value>(value)}
+        value_{value}
     {}
 
     /**
-     * @brief ..
-     * @return ..
-     */
-    [[nodiscard]]
-    constexpr auto tagname() const noexcept -> std::string {
-        auto tag = std::string{name_};
-        std::replace(tag.begin(), tag.end(), ' ', '-');
-        return tag;
-    }
-
-    /**
-     * @brief ..
-     * @return ..
+     * @brief Returns the name of the configuration item.
      */
     [[nodiscard]]
     constexpr auto name() const noexcept -> std::string const&
     { return name_; }
 
-    
     /**
-     * @brief ..
-     * @details ..
-     * @return ..
-     * @{
+     * @brief Returns the tag name of the configuraiton item.
+     * @details Makes a copy of the name and simply replaces any space with a hyphen.
      */
     [[nodiscard]]
-    constexpr auto& value() noexcept
-    { return value_; }
-
-    [[nodiscard]]
-    constexpr auto const& value() const noexcept
-    { return value_; }
-    /** @} */
-
-    /**
-     * @brief ..
-     * @details ..
-     * @return ..
-     */
-    [[nodiscard]]
-    constexpr auto to_string() const -> std::string {
-        return value().type() == dtype::boolean
-            ? std::format("{:>16}", value().get() ? "on" : "off")
-            : std::format("{:16}", value().get());
+    constexpr auto tagname() const noexcept -> std::string {
+        auto tag = std::string{name_};
+        std::ranges::replace(tag, ' ', '-');
+        return tag;
     }
 
     /**
-     * @brief ..
-     * @details ..
-     * @return ..
+     * @brief Returns the stored value converted to a string.
+     * @tparam String Conversion-type, required to be a std::string.
      */
-    template<cc::arithmetic T>
+    template<std::same_as<std::string> String>
     [[nodiscard]]
-    constexpr auto to() const noexcept -> T
-    { return static_cast<T>(value().get()); }
+    constexpr auto to() const -> String
+    { return std::visit([](auto value) { return std::format("{}", value); }, value_); }
 
     /**
-     * @brief ..
-     * @details ..
+     * @brief Returns the stored value.
+     * @tparam Value Type of the value to retrieve, required to match one of the
+     *     instantiated value types.
      */
+    template<cc::same_as_any<Values...> Value>
+    [[nodiscard]]
+    constexpr auto to() const -> Value
+    { return std::get<Value>(value_); }
+
+    /**
+     * @brief Sets a new value to a configuration item, represented as a string.
+     * @details Conversion to a boolean value will only result to true when the given
+     *     string matches "1" or "true".
+     * @param[in] value String that represents an arithmetic value to set.
+     */
+    constexpr auto set(std::string_view value) noexcept -> void {
+         std::visit(util::visitor{
+            [value](bool& value_ref) { value_ref = (value == "1" or value == "true"); },
+            [value](auto& value_ref)
+            { std::from_chars(value.data(), value.data() + value.size(), value_ref); }
+        }, value_);
+    }
+
+    /**
+     * @brief Sets a new value to a configuration item.
+     * @param[in] value Arithmetic value to set, required to be convertible to one of the
+     *     instantiated value types.
+     */
+    constexpr auto set(cc::convertible_to_any<Values...> auto value) noexcept -> void
+    { value_ = value; }
+
+    /**
+     * @brief Contextually converts a configuration item to its stored boolean value.
+     */
+    [[nodiscard]]
+    constexpr explicit operator bool() const noexcept
+        requires cc::same_as_any<bool, Values...>
+    { return std::get<bool>(value_); }
+
+    /**
+     * @brief Implicitly converts a configuration item to its stored value.
+     * @tparam Value Type of the value to retrieve, required to be convertible to one of
+     *     the instantiated value types.
+     */
+    template<cc::convertible_to_any<Values...> Value>
     [[nodiscard]]
     constexpr operator Value() const noexcept
-    { return value().get(); }
+    { return std::visit([](auto value) { return static_cast<Value>(value); }, value_); }
 
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(config_item const&, config_item const&) -> bool = default;
 
 private:
-    /**
-     * @struct ..
-     * @brief ..
-     * @details ..
-     */
-    class config_value {
-    public:
-        /**
-         * @brief ..
-         */
-        config_value() = default;
-
-        /**
-         * @brief ..
-         * @details ..
-         * @param[in] .. ..
-         * @param[in] .. ..
-         */
-        constexpr config_value(dtype type, Value value)
-            : type_{type}, value_{value} {}
-
-        /**
-         * @brief ..
-         * @details ..
-         * @tparam ..
-         * @param[in] .. ..
-         */
-        template<std::invocable<config_item const&, Value> Action>
-        constexpr auto dispatch_type(Action const& action, config_item const& item)
-        const noexcept -> decltype(auto) {
-            switch (type_) {
-            case dtype::boolean:  return std::invoke(action, item, to<dtype::boolean>());
-            case dtype::uint8:    return std::invoke(action, item, to<dtype::uint8>());
-            case dtype::uint16:   return std::invoke(action, item, to<dtype::uint16>());
-            case dtype::int32:    return std::invoke(action, item, to<dtype::int32>());
-            case dtype::fraction: return std::invoke(action, item, to<dtype::fraction>());
-            }
-        }
-
-        /**
-         * @brief ..
-         * @details ..
-         * @tparam ..
-         */
-        template<dtype type>
-        [[nodiscard]]
-        constexpr auto to() const noexcept
-        { return static_cast<typename_from<type>::type>(value_); }
-
-        /**
-         * @brief ..
-         * @return ..
-         */
-        [[nodiscard]]
-        constexpr auto type() const noexcept -> dtype
-        { return type_; }
-
-        /**
-         * @brief ..
-         * @return ..
-         */
-        [[nodiscard]]
-        constexpr auto get() const noexcept -> Value
-        { return value_; }
-
-        /**
-         * @brief ..
-         * @details ..
-         * @tparam ..
-         * @param[in] .. ..
-         * @return ..
-         */
-        constexpr auto set(Value value) noexcept -> void
-        { value_ = value; }
-
-        /**
-         * @brief ..
-         * @details .. attempts to set value type with index 1 when empty
-         * @tparam ..
-         * @param[in] .. ..
-         * @return ..
-         */
-        constexpr auto set(std::string_view value) -> void {
-            auto const from_chars = [this, value](auto result) {
-                std::from_chars(value.data(), value.data() + value.size(), result);
-                value_ = result;
-            };
-            switch (type_) {
-            case dtype::boolean:
-                from_chars(to<dtype::uint8>());
-                value_ = to<dtype::boolean>();
-                return;
-            case dtype::uint8:    return from_chars(to<dtype::uint8>());
-            case dtype::uint16:   return from_chars(to<dtype::uint16>());
-            case dtype::int32:    return from_chars(to<dtype::int32>());
-            case dtype::fraction: return from_chars(to<dtype::fraction>());
-            }
-        }
-
-        /**
-         * @brief ..
-         */
-        [[nodiscard]]
-        friend auto operator==(config_value const&, config_value const&) -> bool = default;
-
-    private:
-        Value value_{};                   /**< .. */
-        dtype type_{dtype_from<Value>{}}; /**< .. */
-    };
-
-    std::string name_;   /**< .. */
-    config_value value_; /**< .. */
+    std::string name_;              /**< Name of the setting. */
+    std::variant<Values...> value_; /**< Arithmetic value to store. */
 };
 
 /**
- * @typedef ..
- * @brief ..
+ * @typedef cfgitem
+ * @brief Configuration item that contains an arithmetic value
+ *     of either bool, uint8, int, or double.
  */
-template<typename Value = double>
-using cfgitem = config_item<Value>;
+using cfgitem = config_item<bool, uint8, int, double>;
 
 /**
- * @struct ..
- * @brief ..
- * @details ..
+ * @struct xmlcfg
+ * @brief XML related configuration.
  */
 struct xmlcfg {
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(xmlcfg const&, xmlcfg const&) -> bool = default;
 
-    ofxXmlSettings file;  /**< .. */
-    std::string filename; /**< .. */
-    std::string tagname;  /**< .. */
+    ofxXmlSettings file;  /**< XML file. */
+    std::string filename; /**< Name of the XML file. */
+    std::string tagname;  /**< Top-level tag name. */
 };
 
-
 /**
- * @struct ..
- * @brief ..
- * @details ..
+ * @struct screencfg
+ * @brief Application screen related configuration.
  */
 struct screencfg {
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(screencfg const&, screencfg const&) -> bool = default;
 
-    cfgitem<> width;  /**< .. */
-    cfgitem<> height; /**< .. */
-    cfgitem<> rate;   /**< .. */
+    cfgitem width;  /**< Width of the application screen. */
+    cfgitem height; /**< Height of the application screen. */
+    cfgitem rate;   /**< Frame rate of the application screen. */
 };
 
 /**
- * @struct ..
- * @brief ..
- * @details ..
+ * @struct pidcfg
+ * @brief PID controller related configuration.
  */
 struct pidcfg {
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(pidcfg const&, pidcfg const&) -> bool = default;
 
-    cfgitem<> kp; /**< .. */
-    cfgitem<> ki; /**< .. */
-    cfgitem<> kd; /**< .. */
+    cfgitem kp; /**< Proportional gain. */
+    cfgitem ki; /**< Integral gain. */
+    cfgitem kd; /**< Derivative gain. */
 };
 
 /**
- * @struct ..
- * @brief ..
- * @details ..
+ * @struct serialcfg
+ * @brief Serial connection related configuration.
  */
 struct serialcfg {
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(serialcfg const&, serialcfg const&) -> bool = default;
 
-    cfgitem<> enabled;  /**< .. */
-    cfgitem<> comport;  /**< .. */
-    cfgitem<> baudrate; /**< .. */
+    cfgitem enabled;  /**< Enables a serial connection. */
+    cfgitem deviceid; /**< Device ID of the serial device. */
+    cfgitem baudrate; /**< Baudrate of the serial connection. */
 };
 
 /**
- * @struct ..
- * @brief ..
- * @details ..
+ * @struct rangecfg
+ * @brief Range related configuration.
+ */
+struct rangecfg {
+    /**
+     * @brief Compares two objects for equality.
+     */
+    [[nodiscard]]
+    friend auto operator==(rangecfg const&, rangecfg const&) -> bool = default;
+
+    cfgitem min; /**< Minimum range value. */
+    cfgitem max; /**< Maximum range value. */
+};
+
+/**
+ * @struct visioncfg
+ * @brief Computer vision related configuration.
  */
 struct visioncfg {
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(visioncfg const&, visioncfg const&) -> bool = default;
 
-    cfgitem<> trackball;     /**< .. */
-    cfgitem<> minballradius; /**< .. */
-    cfgitem<> maxballradius; /**< .. */
+    cfgitem displaydebug; /**< Draws debug visualization lines. */
+    cfgitem trackball;    /**< Enables tracking of the ball. */
+    rangecfg ballradius;  /**< Radius of the ball. */
 };
 
 /**
- * @struct frame
- * @brief ..
+ * @struct framecfg
+ * @brief Camera frame related configuration.
  */
 struct framecfg {
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] depth ..
-     * @return ..
+     * @brief Returns the size of the camera frame.
+     * @param[in] depth Depth of the camera frame, required to be an arithmetic type.
      */
     [[nodiscard]]
-    constexpr auto size(unsigned depth = 1) const noexcept -> unsigned
-    { return depth * width * height; }
+    constexpr auto size(cc::arithmetic auto depth = 1) const noexcept
+    { return depth * width.to<int>() * height.to<int>(); }
 
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(framecfg const&, framecfg const&) -> bool = default;
 
-    cfgitem<> width;  /**< .. */
-    cfgitem<> height; /**< .. */
-    cfgitem<> rate;   /**< .. */
+    cfgitem width;  /**< Width of the camera frame. */
+    cfgitem height; /**< Height of the camera frame. */
+    cfgitem rate;   /**< Frame rate of the camera. */
 };
 
 /**
- * @struct ..
- * @brief ..
- * @details ..
+ * @struct balancecfg
+ * @brief Color balance related configuration.
  */
 struct balancecfg {
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(balancecfg const&, balancecfg const&) -> bool = default;
 
-    cfgitem<> red;       /**< .. */
-    cfgitem<> green;     /**< .. */
-    cfgitem<> blue;      /**< .. */
-    cfgitem<> autowhite; /**< .. */
+    cfgitem red;       /**< Red color balance. */
+    cfgitem green;     /**< Green color balance. */
+    cfgitem blue;      /**< Blue color balance. */
+    cfgitem autowhite; /**< Enables automatic white color balancing. */
 };
 
 /**
- * @struct ..
- * @brief ..
- * @details ..
+ * @struct camcfg
+ * @brief Camera related configuration.
  */
 struct camcfg {
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(camcfg const&, camcfg const&) -> bool = default;
 
-    framecfg frame;       /**< .. */
-    balancecfg balance;   /**< .. */
-    cfgitem<> format;     /**< .. */
-    cfgitem<> exposure;   /**< .. */
-    cfgitem<> sharpness;  /**< .. */
-    cfgitem<> contrast;   /**< .. */
-    cfgitem<> brightness; /**< .. */
-    cfgitem<> hue;        /**< .. */
-    cfgitem<> gain;       /**< .. */
-    cfgitem<> autogain;   /**< .. */
+    framecfg frame;     /**< Camera frame configuration. */
+    balancecfg balance; /**< Color balance configuration. */
+    cfgitem format;     /**< Image color format. */
+    cfgitem exposure;   /**< Image exposure. */
+    cfgitem sharpness;  /**< Image sharpness. */
+    cfgitem contrast;   /**< Image contrast. */
+    cfgitem brightness; /**< Image brightness. */
+    cfgitem hue;        /**< Image hue. */
+    cfgitem gain;       /**< Image gain. */
+    cfgitem autogain;   /**< Enables automatic image gain. */
 };
 
 /**
- * @struct ..
- * @brief ..
- * @details ..
+ * @struct config
+ * @brief Configuration settings of this application.
  */
 struct config {
     /**
-     * @brief ..
-     * @return ..
+     * @brief Returns the default configuration settings.
      */
     [[nodiscard]]
     static auto defaults() noexcept -> config {
@@ -498,61 +333,64 @@ struct config {
                 .filename{"settings.xml"},
                 .tagname{"settings"}},
             .screen{
-                .width{"screen width", dtype::uint16, 800},
-                .height{"screen height", dtype::uint16, 600},
-                .rate{"screen rate", dtype::uint16, 60}},
+                .width{"screen width", 800},
+                .height{"screen height", 600},
+                .rate{"screen rate", 60}},
             .serial{
-                .enabled{"serial enabled", dtype::boolean, true},
-                .comport{"com port", dtype::uint8, 7},
-                .baudrate{"baudrate", dtype::int32, 115'200}},
+                .enabled{"serial enabled", true},
+                .deviceid{"device id", 0},
+                .baudrate{"baudrate", 115'200}},
             .pid{
-                .kp{"proportional", dtype::fraction, 0.3},
-                .ki{"integral", dtype::fraction, 0.001},
-                .kd{"derivative", dtype::fraction, 5.0}},
+                .kp{"proportional", 0.3},
+                .ki{"integral", 0.001},
+                .kd{"derivative", 5.0}},
             .vision{
-                .trackball{"ball tracking", dtype::boolean, true},
-                .minballradius{"min. ball radius", dtype::uint16, 5},
-                .maxballradius{"max. ball radius", dtype::uint16, 75}},
+                .displaydebug{"display debug", true},
+                .trackball{"ball tracking", true},
+                .ballradius{
+                    .min{"min. ball radius", 5},
+                    .max{"max. ball radius", 75}}},
             .cam{
                 .frame{
-                    .width{"frame width", dtype::uint16, 640},
-                    .height{"frame height", dtype::uint16, 480},
-                    .rate{"frame rate", dtype::uint16, 60}},
+                    .width{"frame width", 640},
+                    .height{"frame height", 480},
+                    .rate{"frame rate", 60}},
                 .balance{
-                    .red{"red balance", dtype::uint8, 128},
-                    .green{"green balance", dtype::uint8, 128},
-                    .blue{"blue balance", dtype::uint8, 128},
-                    .autowhite{"auto white bal.", dtype::boolean, false}},
-                .format{"color format", dtype::uint8, ::cam::format::Gray},
-                .exposure{"exposure", dtype::uint8, 20},
-                .sharpness{"sharpness", dtype::uint8, 128},
-                .contrast{"contrast", dtype::uint8, 128},
-                .brightness{"brightness", dtype::uint8, 128},
-                .hue{"hue", dtype::uint8, 128},
-                .gain{"gain", dtype::uint8, 20},
-                .autogain{"auto gain", dtype::boolean, false}}
+                    .red{"red balance", 128_u8},
+                    .green{"green balance", 128_u8},
+                    .blue{"blue balance", 128_u8},
+                    .autowhite{"auto white bal.", false}},
+                .format{"color format", static_cast<int>(cam::format::Gray)},
+                .exposure{"exposure", 20_u8},
+                .sharpness{"sharpness", 128_u8},
+                .contrast{"contrast", 128_u8},
+                .brightness{"brightness", 128_u8},
+                .hue{"hue", 128_u8},
+                .gain{"gain", 20_u8},
+                .autogain{"auto gain", false}}
         };
     }
 
     /**
-     * @brief ..
-     * @details ..
+     * @brief Returns a tuple of all the configuration settings.
+     * @note With static reflection, this helper function will become redundant.
      */
     [[nodiscard]]
-    constexpr auto to_tuple() noexcept {
+    constexpr auto as_tuple() noexcept {
         return std::tie(
             screen.width,
             screen.height,
             screen.rate,
             serial.enabled,
-            serial.comport,
+            serial.deviceid,
             serial.baudrate,
             pid.kp,
             pid.ki,
             pid.kd,
+            vision.displaydebug,
             vision.trackball,
-            vision.minballradius,
-            vision.maxballradius,
+            vision.ballradius.min,
+            vision.ballradius.max,
             cam.frame.width,
             cam.frame.height,
             cam.frame.rate,
@@ -572,50 +410,46 @@ struct config {
     }
 
     /**
-     * @brief ..
-     * @details ..
+     * @brief Loads the configuration settings from an XML file.
      */
     auto loadxml() -> void {
         xml.file.load(xml.filename);
         xml.file.addTag(xml.tagname);
         xml.file.pushTag(xml.tagname);
-        std::apply([this](auto&... item) {
-            ((item.value().set(
-                xml.file.getValue(item.tagname(), item.value().get()))), ...);
-            }, to_tuple());
+        std::apply([this](auto&... items) {
+            ((items.set(xml.file.getValue(
+                items.tagname(), items.to<std::string>()))), ...);
+        }, as_tuple());
         xml.file.popTag();
         xml.file.clear();
     }
 
     /**
-     * @brief ..
-     * @details ..
+     * @brief Saves the configuration settings to an XML file.
      */
     auto savexml() -> void {
         xml.file.addTag(xml.tagname);
         xml.file.pushTag(xml.tagname);
-        std::apply([this](auto&... items) {
-            auto const xmlsetter = [&](auto const& item, auto value)
-                { xml.file.setValue(item.tagname(), value); };
-            ((items.value().dispatch_type(xmlsetter, items)), ...);
-        }, to_tuple());
+        std::apply([this](auto const&... items) {
+            (xml.file.setValue(items.tagname(), items.to<std::string>()), ...);
+        }, as_tuple());
         xml.file.saveFile(xml.filename);
         xml.file.popTag();
         xml.file.clear();
     }
 
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
     friend auto operator==(config const&, config const&) -> bool = default;
 
-    xmlcfg xml;       /**< .. */
-    screencfg screen; /**< .. */
-    serialcfg serial; /**< .. */
-    pidcfg pid;       /**< .. */
-    visioncfg vision; /**< .. */
-    camcfg cam;       /**< .. */
+    xmlcfg xml;       /**< XML configuration. */
+    screencfg screen; /**< Application screen configuration. */
+    serialcfg serial; /**< Serial connection configuration. */
+    pidcfg pid;       /**< PID controller configuration. */
+    visioncfg vision; /**< Computer vision configuration. */
+    camcfg cam;       /**< Camera configuration. */
 };
 
 } // namespace cfg

@@ -6,8 +6,7 @@
  * @author     Rick Horeman
  * @copyright  GPL-3.0 license
  * 
- * @brief ..
- * @details ..
+ * @brief Implementation of the PS3 Eye camera interface.
  */
 
 #include "camera.h"
@@ -17,17 +16,14 @@
 
 /**
  * @namespace cam
- * @brief ..
+ * @brief Camera related components.
  */
 namespace cam {
 
 /**
- * @copydoc framestats::update
- * @internal ..
- * 
- * @todo fix this
+ * @copydoc frame_info::update
  */
-auto framestats::update() -> void {
+auto frame_info::update() -> void {
     ++count;
 
     auto const time = ofGetElapsedTimeMillis();
@@ -39,10 +35,9 @@ auto framestats::update() -> void {
 }
 
 /**
- * @copydoc getdevice
- * @internal ..
+ * @copydoc get_device
  */
-auto getdevice(devlist::size_type device_id) -> devptr {
+auto get_device(devlist::size_type device_id) -> devptr {
     auto const& devices = ps3cam::getDevices();
     if (device_id >= devices.size()) {
         throw camera_error{"could not find ps3 camera"};

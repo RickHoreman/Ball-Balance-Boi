@@ -6,20 +6,17 @@
  * @author     Rick Horeman
  * @copyright  GPL-3.0 license
  *
- * @brief ..
- * @details ..
+ * @brief User interface application based upon the OpenFrameworks library.
  */
 
 #ifndef OF_APPLICATION_H
 #define OF_APPLICATION_H
 
-#include "ps3eye.h"
 #include "camera.h"
 #include "config.h"
-#include "memory.h"
 #include "menu.h"
-#include "serial.h"
 #include "types.h"
+#include "utility.h"
 
 #include <ofMain.h>
 #include <ofBaseApp.h>
@@ -29,35 +26,43 @@
 #include <array>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 /**
- * @namespace ..
- * @brief ..
+ * @namespace of
+ * @brief OpenFrameworks related components.
  */
 namespace of {
 
 /**
+ * @struct serial_error
+ * @brief Exception related to serial connections.
+ */
+struct serial_error : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+/**
  * @class app
- * @brief ..
- * @details ..
+ * @brief OpenFrameworks user inteface application.
  */
 class app : public ofBaseApp {
 public:
     /**
-     * @brief ..
+     * @brief Default constructs a user interface application.
      */
     app() = default;
 
     /**
-     * @brief ..
+     * @brief Constructs a user interface application with a given configuration.
+     * @param[in] appconfig Configuration that describes the application's behavior.
      */
-    app(cfg::config& appconfig, comm::serial& serialcomm)
-        : appcfg{&appconfig}, serial{&serialcomm} {}
+    explicit app(cfg::config& appconfig)
+        : appcfg{&appconfig} {}
 
     /**
-     * @brief ..
-     * @details ..
+     * @brief Core mechanics of this application.
      * @{
      */
     auto setup() -> void override;
@@ -67,8 +72,7 @@ public:
     /** @} */
 
     /**
-     * @brief ..
-     * @details ..
+     * @brief Event-based mechanics of this application.
      * @{
      */
     auto keyPressed(int key) -> void override;
@@ -84,169 +88,185 @@ public:
 
 private:
     /**
-     * @brief ..
-     */
-    auto trackball() -> void;
-
-    /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
-     * @param[in] .. ..
+     * @brief Drawing mechanics.
+     * @param[in] x Window coordinate along the x-axis.
+     * @param[in] y Window coordinate along the y-axis.
      * @{
      */
-    auto drawcamera(float x, float y) const -> void;
-    auto drawmenu(float x, float y) const -> void;
-    auto drawfps(float x, float y) const -> void;
+    auto draw_camera(float x, float y) const -> void;
+    auto draw_menu(float x, float y) const -> void;
+    auto draw_fps(float x, float y) const -> void;
+    auto draw_debug() const -> void;
     /** @} */
 
     /**
-     * @brief ..
-     * @details ..
+     * @brief Menu interface mechanics.
      * @{
      */
-    auto initmenu() noexcept -> void;
-    auto showmenu() noexcept -> void;
-    auto exitmenu() noexcept -> void;
+    auto make_menu() noexcept -> void;
+    auto show_menu() noexcept -> void;
+    auto exit_menu() noexcept -> void;
     /** @} */
 
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
+     * @brief Handling of user-input events.
+     * @param[in] key Key-code of the pressed key.
+     * @param[in] x Mouse position along the x-axis.
+     * @param[in] y Mouse position along the y-axis.
      * @{
      */
-    auto handle_appinput(int key) noexcept -> void;
-    auto handle_menuinput(int key) noexcept -> void;
-    auto handle_inputvalue(int key) -> void;
+    auto handle_key_event(int key) noexcept -> void;
+    auto handle_menu_event(int key) noexcept -> void;
+    auto handle_input_event(int key) -> void;
+    auto handle_mouse_event(int x, int y) -> void;
     /** @} */
-
-    /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
-     */
-    auto select_option(int key) noexcept -> void;
     
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
+     * @brief Value input mechanics.
+     * @param[in] key Key-code of the pressed key.
      * @{
      */
-    auto apply_inputvalue() -> void;
-    auto erase_inputvalue() noexcept -> void;
-    auto add_inputvalue(unsigned char key) noexcept -> void;
+    auto apply_input_value() -> void;
+    auto erase_input_value() noexcept -> void;
+    auto add_input_value(unsigned char key) noexcept -> void;
     /** @} */
 
     /**
-     * @brief ..
-     * @details ..
+     * @brief Selects a menu option, if it exists.
+     * @param[in] key Key-code of the pressed key.
      */
-    auto drawDebug() const -> void;
+    auto select_option(unsigned char key) noexcept -> void;
 
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
+     * @brief Starts a connection with a serial device.
+     * @details The device ID can be set in the configuration file.
      */
-    auto genTransMatrix(int i) -> void;
+    auto start_serial() -> void;
 
     /**
-     * @brief ..
-     * @details ..
+     * @brief Tracks the position of the ball.
+     * @details Applies a computer vision algorithm to the camera feed.
      */
+    auto track_ball() -> void;
+
+    /**
+     * @brief Controls the PID values.
+     * @details Calculates the required angles for the servo controller based on the
+     *     current and historic positions of the ball while taking previously applied
+     *     correction into account.
+     */
+    auto control_pid() -> void;
+
+    /**
+     * @brief Generates transformation matrices for the given servo axis.
+     * @param[in] axis Servo axis for which the matrix will be generated.
+     */
+    auto genTransMatrix(int axis) -> void;
+
+    /**
+     * @brief Calibration mechanics.
+     * @details Provides a mapping between the coordinates of the camera feed and the
+     *     axes of the servo motors.
+     * @param[in] x Mouse position along the x-axis.
+     * @param[in] y Mouse position along the y-axis.
+     * @{
+     */
+    auto calibrate(int x, int y) -> void;
+    auto recalibrate() -> void;
     auto finishCalibration() -> void;
+    /** @} */
 
     /**
-     * @brief ..
-     * @details ..
-     * @param[in] .. ..
-     * @param[in] .. ..
+     * @brief Setpoint mechanics.
+     * @details Allows the user to define a new setpoint to which the ball should be
+     *     positioned in real time.
+     * @param[in] x Mouse position along the x-axis.
+     * @param[in] y Mouse position along the y-axis.
+     * @{
      */
     auto setSetPoint(int x, int y) -> void;
-
-    /**
-     * @brief ..
-     * @details ..
-     */
     auto updateSetPoint() -> void;
+    /** @} */
 
     /**
-     * @brief ..
-     * @details ..
+     * @enum appstate
+     * @brief Global state of the application.
      */
-    auto reCalibrate() -> void;
-
-    /**
-     * @brief ..
-     * @details ..
-     */
-    auto controlpid() -> void;
-
-    using action_type = std::function<void(cfg::cfgitem<> const&)>; /**< .. */
-    using menu_type = opt::menu<cfg::cfgitem<>, action_type>;       /**< .. */
-
-    /**
-     * @enum ..
-     * @brief ..
-     */
-    enum class keyinput {
-        app,  /**< .. */
-        menu, /**< .. */
-        value /**< .. */
+    enum class appstate {
+        running,    /**< Running the application. */
+        calibration /**< Calibrating the camera and servo motors. */
     };
 
-    enum appState {
-        running,    /**< .. */
-        calibration /**< .. */
+    /**
+     * @enum inputstate
+     * @brief Relates to user input. 
+     */
+    enum class inputstate {
+        app,  /**< Waiting for application input. */
+        menu, /**< Selecting a menu option. */
+        value /**< Entering a new value for a setting. */
     };
 
-    mem::access_ptr<cfg::config> appcfg;  /**< .. */
-    mem::access_ptr<comm::serial> serial; /**< .. */
+    /**
+     * @typedef matrix_type
+     * @brief Container type for position vectors.
+     * @tparam N Number of position vectors.
+     */
+    template<std::size_t N>
+    using matrix_type = std::array<ofPoint, N>;
 
-    cam::devptr camera;                /**< .. */
-    cam::framestats camstats;          /**< .. */
-    std::unique_ptr<uint8[]> camframe; /**< .. */
-    cv::Mat frame;                     /**< .. */
-    cv::Point ballpos;                 /**< .. */
+    util::access_ptr<cfg::config> appcfg; /**< Application configuration. */
+    ofSerial serial;                      /**< Serial connection. */
+    cam::devptr camera;                   /**< PS3 Eye camera. */
+    cam::frame_info camstats;             /**< Camera statistics. */
+    std::unique_ptr<uint8[]> camframe;    /**< Live camera frame. */
+    cv::Mat frame;                        /**< Transformed camera frame. */
 
-    keyinput inputmode{};    /**< .. */
-    menu_type cfgmenu;       /**< .. */
-    std::string inputvalue;  /**< .. */
-    std::string valueprompt; /**< .. */
-    std::string menuprompt;  /**< .. */
+    ui::menu<cfg::cfgitem, std::function<void()>> cfgmenu; /**< Configuration menu. */
+    inputstate inputmode{inputstate::app}; /**< User input mode. */
+    std::string inputvalue;                /**< Input value buffer. */
+    std::string valueprompt;               /**< Input value interface. */
+    std::string menuprompt;                /**< Menu interface. */
 
-    bool displayDebugVisualisation = true; /**< .. */
+    struct {
+        double kp; /**< Proportional gain. */
+        double ki; /**< Integral gain. */
+        double kd; /**< Derivative gain. */
+    } pid;         /**< PID controller values. */
 
-    appState state = calibration; /**< .. */
-    int pointsCalibrated = 0;     /**< .. */
-    
-    std::array<ofPoint, 3> calibrationPoints;     /**< .. */
-    std::array<ofPoint, 3> transMatricesPreScale; /**< .. */
-    std::array<ofPoint, 3> transMatrices;         /**< .. */
+    struct {
+        int min;  /**< Minimum ball radius. */
+        int max;  /**< Maximum ball radius. */
+    } ballradius; /**< Ball radius values. */
 
-    float targetScale;    /**< .. */
-    ofPoint targetCenter; /**< .. */
-    ofPoint centerPoint;  /**< .. */
+    appstate appmode = appstate::calibration; /**< Global application state. */
+    int pointsCalibrated{0};                  /**< Calibrated points counter. */
 
-    ofPoint ballPos;          /**< .. */
-    ofPoint setPoint;         /**< .. */
-    ofPoint oldSetPoint;      /**< .. */
-    ofPoint newSetPoint;      /**< .. */
-    ofTime startTime;         /**< .. */
-    double moveTimeSec = 1.f; /**< .. */
+    matrix_type<3> calibrationPoints;     /**< Servo positions. */
+    matrix_type<3> transMatricesPreScale; /**< Transformation matrices pre-scaling. */
+    matrix_type<3> transMatrices;         /**< Transformation matrices post-scaling. */
 
-    std::array<float, 3> ballPosPerAxis;  /**< .. */
-    std::array<float, 3> setPointPerAxis; /**< .. */
+    float targetScale;    /**< Approximated target setup scale in mm. */
+    ofPoint targetCenter; /**< Approximated target setup center point in mm. */
+    ofPoint centerPoint;  /**< Center of the calibration points. */
 
-    std::vector<ofPolyline> debugLines;   /**< .. */
-    std::vector<ofColor> debugLineColors; /**< .. */
+    ofPoint ballPos;         /**< Ball position. */
+    ofPoint setPoint;        /**< Setpoint position. */
+    ofPoint oldSetPoint;     /**< Previous setpoint position. */
+    ofPoint newSetPoint;     /**< Future setpoint position. */
+    ofTime startTime;        /**< Setpoint movement start time. */
+    double moveTimeSec{1.0}; /**< Setpoint total movement time. */
 
-    std::array<double, 3> prevError{0.f,0.f,0.f}; /**< .. */
-    std::array<double, 3> iError{0.f,0.f,0.f};    /**< .. */
-    std::array<std::array<double, 5>, 3> servoAction{0.f,0.f,0.f}; /**< .. */
-    int servoActI = 0; /**< .. */
+    std::array<float, 3> ballPosPerAxis;  /**< Ball position per servo axis. */
+    std::array<float, 3> setPointPerAxis; /**< Setpoint position per servo axis. */
+
+    std::vector<ofPolyline> debugLines;   /**< Debug visualization lines. */
+    std::vector<ofColor> debugLineColors; /**< Debug visualization line colors. */
+
+    std::array<double, 3> prevError{0.0}; /**< Previous ball position error. */
+    std::array<double, 3> iError{0.0};    /**< Current ball position error. */
+    std::array<std::array<double, 5>, 3> servoAction{0.0}; /**< Servo angles. */
+    int servoActI{0}; /**< Servo action index for the moving average filter. */
 };
 
 } // namespace of

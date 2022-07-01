@@ -6,8 +6,7 @@
  * @author     Rick Horeman
  * @copyright  GPL-3.0 license
  *
- * @brief ..
- * @details ..
+ * @brief Implementation of the user interface ball-tracking application.
  */
 
 #include "application.h"
@@ -17,84 +16,95 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cmath>
 #include <format>
-#include <iostream>
 #include <memory>
+#include <numbers>
 #include <numeric>
 #include <vector>
 
 /**
-* @namespace ..
-* @brief ..
-*/
+ * @namespace of
+ * @brief OpenFrameworks related components.
+ */
 namespace of {
 
 /**
- * @copydoc application::setup
- * @internal ..
+ * @copydoc app::setup
  */
 auto app::setup() -> void {
-    camera = cam::getdevice();
-    cam::initcamera(*camera, appcfg->cam);
+    camera = cam::get_device();
+    cam::start_camera(*camera, appcfg->cam);
     auto const framesize = appcfg->cam.frame.size(camera->getOutputBytesPerPixel());
     camframe = std::make_unique_for_overwrite<std::uint8_t[]>(framesize);
     frame = cv::Mat{
-        appcfg->cam.frame.height.to<uint16>(),
-        appcfg->cam.frame.width.to<uint16>(),
+        appcfg->cam.frame.height.to<int>(),
+        appcfg->cam.frame.width.to<int>(),
         CV_8UC1, camframe.get()};
+    ballradius.min = appcfg->vision.ballradius.min;
+    ballradius.max = appcfg->vision.ballradius.max;
+    pid.kp = appcfg->pid.kp;
+    pid.ki = appcfg->pid.ki;
+    pid.kd = appcfg->pid.kd;
     if (appcfg->serial.enabled) {
-        serial->setup();
+        start_serial();
     }
-    initmenu();    
+    make_menu();
 }
 
 /**
- * @brief ..
- * @details ..
+ * @copydoc app::start_serial
  */
-auto app::initmenu() noexcept -> void {
-    cfgmenu.add('p', appcfg->pid.kp);
-    cfgmenu.add('i', appcfg->pid.ki);
-    cfgmenu.add('d', appcfg->pid.kd);
+auto app::start_serial() -> void {
+    if (serial.setup(appcfg->serial.deviceid, appcfg->serial.baudrate)) return;
+    throw serial_error{"unable to open serial device #"
+        + appcfg->serial.deviceid.to<std::string>()};
+}
 
+/**
+ * @copydoc app::make_menu
+ */
+auto app::make_menu() noexcept -> void {
+    cfgmenu.add('p', appcfg->pid.kp, [this]{ pid.kp = appcfg->pid.kp; });
+    cfgmenu.add('i', appcfg->pid.ki, [this]{ pid.ki = appcfg->pid.ki; });
+    cfgmenu.add('d', appcfg->pid.kd, [this]{ pid.kd = appcfg->pid.kd; });
+
+    cfgmenu.add('v', appcfg->vision.displaydebug);
     cfgmenu.add('l', appcfg->vision.trackball);
-    cfgmenu.add('z', appcfg->vision.minballradius);
-    cfgmenu.add('y', appcfg->vision.maxballradius);
+    cfgmenu.add('z', appcfg->vision.ballradius.min,
+        [this]{ ballradius.min = appcfg->vision.ballradius.min; });
+    cfgmenu.add('y', appcfg->vision.ballradius.max,
+        [this]{ ballradius.max = appcfg->vision.ballradius.max; });
 
     cfgmenu.add('s', appcfg->serial.enabled,
-        [this](auto const& cfgitem) { cfgitem ? serial->setup() : serial->exit(); });
+        [this]{ appcfg->serial.enabled ? start_serial() : serial.close(); });
 
     cfgmenu.add('h', appcfg->cam.sharpness,
-        [this](auto const& cfgitem) { camera->setSharpness(cfgitem); });
+        [this]{ camera->setSharpness(appcfg->cam.sharpness); });
     cfgmenu.add('e', appcfg->cam.exposure,
-        [this](auto const& cfgitem) { camera->setExposure(cfgitem); });
+        [this]{ camera->setExposure(appcfg->cam.exposure); });
     cfgmenu.add('c', appcfg->cam.contrast,
-        [this](auto const& cfgitem) { camera->setContrast(cfgitem); });
+        [this]{ camera->setContrast(appcfg->cam.contrast); });
     cfgmenu.add('b', appcfg->cam.brightness,
-        [this](auto const& cfgitem) { camera->setBrightness(cfgitem); });
+        [this]{ camera->setBrightness(appcfg->cam.brightness); });
 
-    cfgmenu.add('g', appcfg->cam.gain,
-        [this](auto const& cfgitem) { camera->setGain(cfgitem); });
-    cfgmenu.add('h', appcfg->cam.hue,
-        [this](auto const& cfgitem) { camera->setHue(cfgitem); });
+    cfgmenu.add('g', appcfg->cam.gain, [this]{ camera->setGain(appcfg->cam.gain); });
+    cfgmenu.add('h', appcfg->cam.hue,  [this]{ camera->setHue(appcfg->cam.hue); });
 
     cfgmenu.add('r', appcfg->cam.balance.red,
-        [this](auto const& cfgitem) { camera->setRedBalance(cfgitem); });
+        [this]{ camera->setRedBalance(appcfg->cam.balance.red); });
     cfgmenu.add('n', appcfg->cam.balance.green,
-        [this](auto const& cfgitem) { camera->setGreenBalance(cfgitem); });
+        [this]{ camera->setGreenBalance(appcfg->cam.balance.green); });
     cfgmenu.add('u', appcfg->cam.balance.blue,
-        [this](auto const& cfgitem) { camera->setBlueBalance(cfgitem); });
+        [this]{ camera->setBlueBalance(appcfg->cam.balance.blue); });
 
     cfgmenu.add('w', appcfg->cam.balance.autowhite,
-        [this](auto const& cfgitem) { camera->setAutoWhiteBalance(cfgitem); });
+        [this]{ camera->setAutoWhiteBalance(appcfg->cam.balance.autowhite); });
     cfgmenu.add('a', appcfg->cam.autogain,
-        [this](auto const& cfgitem) { camera->setAutogain(cfgitem); });
+        [this]{ camera->setAutogain(appcfg->cam.autogain); });
 }
 
 /**
  * @copydoc app::exit
- * @internal ..
  */
 auto app::exit() -> void {
     if (not camera) return;
@@ -103,7 +113,6 @@ auto app::exit() -> void {
 
 /**
  * @copydoc app::update
- * @internal ..
  */
 auto app::update() -> void {
     if (not camera) return;
@@ -112,16 +121,16 @@ auto app::update() -> void {
     updateSetPoint();
     camstats.update();
     if (appcfg->vision.trackball) {
-        trackball();
+        track_ball();
     }
-    if (state == appState::calibration and appcfg->serial.enabled) {
-        serial->write(std::format("{:.5f} {:.5f} {:.5f} \n", 45.0, 45.0, 45.0));
+    if (appmode == appstate::calibration and appcfg->serial.enabled) {
+        constexpr auto servopos = std::string_view{"45.0 45.0 45.0 \n"};
+        serial.writeBytes(servopos.data(), servopos.size());
     }
 }
 
 /**
  * @copydoc app::updateSetPoint
- * @internal ..
  */
 auto app::updateSetPoint() -> void {
     constexpr auto cosineInterpolate = [](double y1, double y2, double mu) {
@@ -141,7 +150,6 @@ auto app::updateSetPoint() -> void {
 
 /**
  * @copydoc app::setSetPoint
- * @internal ..
  */
 auto app::setSetPoint(int x, int y) -> void {
     startTime = ofGetCurrentTime();
@@ -152,123 +160,114 @@ auto app::setSetPoint(int x, int y) -> void {
 }
 
 /**
- * @copydoc app::trackball
- * @internal ..
+ * @copydoc app::track_ball
  */
-auto app::trackball() -> void {
+auto app::track_ball() -> void {
     std::vector<cv::Vec3f> circles;
     cv::HoughCircles(frame, circles, cv::HOUGH_GRADIENT, 1, 1000, 200, 20,
-        appcfg->vision.minballradius, appcfg->vision.maxballradius);
-    for (std::size_t i = 0; i < circles.size(); i++) {
-        if (i == 0) {
-            cv::Vec3i c = circles[i];
-            cv::Point center = cv::Point(c[0], c[1]);
-            cv::circle(frame, center, 1, cv::Scalar(0, 100, 100), 3, cv::LINE_AA);
-            int radius = c[2];
-            cv::circle(frame, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
-            if (state == appState::running) {
-                ballPos = {float(center.x), float(center.y)};
-                for (int j{}; j < 3; j++) {
-                    ballPosPerAxis[j] = (ballPos.x - centerPoint.x) * transMatrices[j].x
-                        + (ballPos.y - centerPoint.y) * transMatrices[j].y;
-                }
-                controlpid();
-            }
+        ballradius.min, ballradius.max);
+    if (circles.size() == 0) return;
+    cv::Vec3i c = circles[0];
+    cv::Point center = cv::Point(c[0], c[1]);
+    cv::circle(frame, center, 1, cv::Scalar(0, 100, 100), 3, cv::LINE_AA);
+    int radius = c[2];
+    cv::circle(frame, center, radius, cv::Scalar(255, 0, 255), 3, cv::LINE_AA);
+    if (appmode == appstate::running) {
+        ballPos = {float(center.x), float(center.y)};
+        for (int j{}; j < 3; j++) {
+            ballPosPerAxis[j] = (ballPos.x - centerPoint.x) * transMatrices[j].x
+                + (ballPos.y - centerPoint.y) * transMatrices[j].y;
         }
+        control_pid();
     }
 }
 
 /**
- * @copydoc app::pid
- * @internal ..
+ * @copydoc app::control_pid
  */
-auto app::controlpid() -> void {
+auto app::control_pid() -> void {
     std::string output;
     for (int i{}; i < 3; i++) {
         double error = setPointPerAxis[i] - ballPosPerAxis[i];
-        iError[i] += error * appcfg->pid.ki;
+        iError[i] += error * pid.ki;
         iError[i] = std::clamp(iError[i], -10.0, 10.0);
-        servoAction[i][servoActI] = appcfg->pid.kp * error + iError[i]
-            + appcfg->pid.kd * (error - prevError[i]);
+        servoAction[i][servoActI] = pid.kp * error + iError[i]
+            + pid.kd * (error - prevError[i]);
         servoAction[i][servoActI] = std::clamp(servoAction[i][servoActI], -10.0, 45.0);
         double action;
         if (error - prevError[i] < 1.75) {
-            action = std::reduce(servoAction[i].begin(), servoAction[i].end()) / servoAction[i].size();
+            action = std::reduce(
+                servoAction[i].begin(), servoAction[i].end()) / servoAction[i].size();
         } else {
             action = servoAction[i][servoActI];
         }
         prevError[i] = error;
-
         output += std::format("{:.5f} ", action + 45.0);
     }
     servoActI++;
     servoActI %= servoAction[0].size();
     output += "\n";
-    std::cout << output;
 
-    if (state == appState::running) {
-        serial->write(output);
+    if (appmode == appstate::running and appcfg->serial.enabled) {
+        serial.writeBytes(output.data(), output.size());
     }
 }
 
 /**
  * @copydoc app::draw
- * @internal ..
  */
 auto app::draw() -> void {
     ofSetHexColor(0xffffff);
-    drawcamera(0, 0);
-    drawfps(10, 15);
-    drawmenu(650, 150);
+    draw_camera(0, 0);
+    draw_fps(10, 15);
+    draw_menu(650, 150);
 }
 
 /**
- * @copydoc app::drawcamera
- * @internal ..
+ * @copydoc app::draw_camera
  */
-auto app::drawcamera(float x, float y) const -> void {
+auto app::draw_camera(float x, float y) const -> void {
     ofxCv::drawMat(frame, 0, 0, GL_R8);
 
-    if (displayDebugVisualisation) {
-        drawDebug();
+    if (appcfg->vision.displaydebug) {
+        draw_debug();
     }
-    switch (state) {
-    case appState::calibration:
-        ofDrawBitmapString(std::format(
+    switch (appmode) {
+    case appstate::calibration:
+        return ofDrawBitmapString(std::format(
             "Please click calibration point {}",
             pointsCalibrated + 1), 190, 200);
+    default:
+        return;
     }
 }
 
 /**
- * @copydoc app::drawfps
- * @internal ..
+ * @copydoc app::draw_fps
  */
-auto app::drawfps(float x, float y) const -> void {
+auto app::draw_fps(float x, float y) const -> void {
     ofDrawBitmapString(std::format(
         "app fps: {:.2f}\ncam fps: {:.2f}",
         ofGetFrameRate(), camstats.fps()), x, y);
 }
 
 /**
- * @copydoc app::drawmenu
- * @internal ..
+ * @copydoc app::draw_menu
  */
-auto app::drawmenu(float x, float y) const -> void {
+auto app::draw_menu(float x, float y) const -> void {
     ofDrawBitmapString(std::format("{}\n{}{}",
         menuprompt, valueprompt, inputvalue), x, y);
 }
 
 /**
- * @copydoc app::drawDebug
- * @internal ..
+ * @copydoc app::draw_debug
  */
-auto app::drawDebug() const -> void {
+auto app::draw_debug() const -> void {
     for (int i{0}; i < debugLines.size(); i++) {
         ofSetColor(debugLineColors[i]);
         debugLines[i].draw();
     }
-    if (state == appState::running) {
+    if (appmode == appstate::running) {
         for (int i{0}; i < transMatrices.size(); i++) {
 
             float result = (ballPos.x - centerPoint.x) * transMatricesPreScale[i].x
@@ -289,7 +288,7 @@ auto app::drawDebug() const -> void {
             ofSetColor(color);
             resLine.draw();
 
-            //Scaled output shown as sliders:
+            // Scaled output shown as sliders:
 
             float scaledRes = (ballPos.x - centerPoint.x) * transMatrices[i].x
                 + (ballPos.y - centerPoint.y) * transMatrices[i].y;
@@ -302,7 +301,8 @@ auto app::drawDebug() const -> void {
             pointer.addVertices({displayPos + ofPoint{scaledRes + targetScale, -5},
                 displayPos + ofPoint{scaledRes + targetScale, 5}});
             ofPolyline center;
-            center.addVertices({displayPos + ofPoint{targetScale, -3}, displayPos + ofPoint{targetScale, 3}});
+            center.addVertices({displayPos + ofPoint{targetScale, -3},
+                displayPos + ofPoint{targetScale, 3}});
             scale.draw();
             pointer.draw();
             center.draw();
@@ -318,7 +318,8 @@ auto app::drawDebug() const -> void {
 
             ofSetColor({255, 128, 128});
             ofPolyline setpointer;
-            setpointer.addVertices({displayPos + ofPoint{setPointPerAxis[i] + targetScale, -5},
+            setpointer.addVertices(
+                {displayPos + ofPoint{setPointPerAxis[i] + targetScale, -5},
                 displayPos + ofPoint{setPointPerAxis[i] + targetScale, 5}});
             setpointer.draw();
         }
@@ -330,12 +331,12 @@ auto app::drawDebug() const -> void {
 
 /**
  * @copydoc app::finishCalibration
- * @internal ..
  */
 auto app::finishCalibration() -> void {
-    centerPoint = {(calibrationPoints[0].x + calibrationPoints[1].x + calibrationPoints[2].x) / 3,
-        (calibrationPoints[0].y + calibrationPoints[1].y + calibrationPoints[2].y) / 3};
-
+    centerPoint = {
+        (calibrationPoints[0].x + calibrationPoints[1].x + calibrationPoints[2].x) / 3,
+        (calibrationPoints[0].y + calibrationPoints[1].y + calibrationPoints[2].y) / 3
+    };
     for (int i{0}; i < calibrationPoints.size(); i++) {
         int j = i + 1;
         if (j >= calibrationPoints.size()) {
@@ -373,12 +374,11 @@ auto app::finishCalibration() -> void {
     setPoint = {640 / 2.f, 480 / 2.f};
     setSetPoint(640 / 2, 480 / 2);
 
-    state = appState::running;
+    appmode = appstate::running;
 }
 
 /**
  * @copydoc app::genTransMatrix
- * @internal ..
  */
 auto app::genTransMatrix(int i) -> void {
     ofPoint vTrans{0, 1};
@@ -388,169 +388,162 @@ auto app::genTransMatrix(int i) -> void {
     float mV = std::sqrt(std::pow(v.x, 2) + std::pow(v.y, 2));
     float rTrans = std::atan((v.y) / (v.x)) - std::atan(vTrans.y / vTrans.x);
     if (v.x < 0 or (v.x == 0 and v.y < 0)) {
-        rTrans += M_PI;
+        rTrans += std::numbers::pi;
     }
     vTrans = {std::cos(rTrans) * vTrans.x - std::sin(rTrans) * vTrans.y,
         std::sin(rTrans) * vTrans.x + std::cos(rTrans) * vTrans.y};
     transMatricesPreScale[i] = vTrans;
-
     transMatrices[i] = vTrans / mV * targetScale;
 };
 
 /**
  * @copydoc app::keyPressed
- * @internal ..
  */
 auto app::keyPressed(int key) -> void {
     switch (inputmode) {
-    case keyinput::app:   return handle_appinput(key);
-    case keyinput::menu:  return handle_menuinput(key);
-    case keyinput::value: return handle_inputvalue(key);
-    default:              return;
+    case inputstate::app:   return handle_key_event(key);
+    case inputstate::menu:  return handle_menu_event(key);
+    case inputstate::value: return handle_input_event(key);
+    default:                return;
     }
 }
 
 /**
- * @copydoc app::handle_app_input
- * @internal ..
+ * @copydoc app::handle_key_event
  */
-auto app::handle_appinput(int key) noexcept -> void {
+auto app::handle_key_event(int key) noexcept -> void {
     switch (key) {
-    case OF_KEY_TAB:     return showmenu();
-    case OF_KEY_CONTROL: return reCalibrate();
+    case OF_KEY_TAB:     return show_menu();
+    case OF_KEY_CONTROL: return recalibrate();
     default:             return;
     }
 }
 
 /**
- * @copydoc app::showmenu
- * @internal ..
+ * @copydoc app::show_menu
  */
-auto app::showmenu() noexcept -> void {
-    menuprompt = cfgmenu.to_string();
-    inputmode = keyinput::menu;
+auto app::show_menu() noexcept -> void {
+    menuprompt = cfgmenu.to<std::string>();
+    inputmode = inputstate::menu;
 }
 
 /**
- * @copydoc app::reCalibrate
- * @internal ..
+ * @copydoc app::recalibrate
  */
-auto app::reCalibrate() -> void {
-    state = appState::calibration;
+auto app::recalibrate() -> void {
     debugLines.clear();
     debugLineColors.clear();
     pointsCalibrated = 0;
+    appmode = appstate::calibration;
 }
 
 /**
- * @copydoc app::handle_menuinput
- * @internal ..
+ * @copydoc app::handle_menu_event
  */
-auto app::handle_menuinput(int key) noexcept -> void {
+auto app::handle_menu_event(int key) noexcept -> void {
     switch (key) {
-    case OF_KEY_TAB: return exitmenu();
+    case OF_KEY_TAB: return exit_menu();
     default:         return select_option(key);
     }
 }
 
 /**
- * @copydoc app::exitmenu
- * @internal ..
+ * @copydoc app::exit_menu
  */
-auto app::exitmenu() noexcept -> void {
+auto app::exit_menu() noexcept -> void {
     menuprompt.clear();
-    inputmode = keyinput::app;
+    inputmode = inputstate::app;
 }
 
 /**
  * @copydoc app::select_option
- * @internal ..
  */
-auto app::select_option(int key) noexcept -> void {
-    if (not cfgmenu.contains(key)) return;
+auto app::select_option(unsigned char key) noexcept -> void {
+    if (not cfgmenu.select(key)) return;
 
-    cfgmenu.select(key);
     valueprompt = std::format("{:c} | new value: ", std::toupper(key));
-    inputmode = keyinput::value;
+    inputmode = inputstate::value;
 }
 
 /**
- * @copydoc app::handle_inputvalue
- * @internal ..
+ * @copydoc app::handle_input_event
  */
-auto app::handle_inputvalue(int key) -> void {
+auto app::handle_input_event(int key) -> void {
     switch (key) {
-    case OF_KEY_RETURN:    return apply_inputvalue();
-    case OF_KEY_BACKSPACE: return erase_inputvalue();
-    default:               return add_inputvalue(key);
+    case OF_KEY_RETURN:    return apply_input_value();
+    case OF_KEY_BACKSPACE: return erase_input_value();
+    default:               return add_input_value(key);
     }
 }
 
 /**
- * @copydoc app::apply_inputvalue
- * @internal ..
+ * @copydoc app::apply_input_value
  */
-auto app::apply_inputvalue() -> void {
+auto app::apply_input_value() -> void {
     if (inputvalue.empty()) return;
 
-    cfgmenu.selection().value().apply(inputvalue);
-    menuprompt = cfgmenu.to_string();
+    cfgmenu.selection().apply(inputvalue);
+    menuprompt = cfgmenu.to<std::string>();
     valueprompt.clear();
     inputvalue.clear();
-    inputmode = keyinput::menu;
+    inputmode = inputstate::menu;
 }
 
 /**
- * @copydoc app::erase_inputvalue
- * @internal ..
+ * @copydoc app::erase_input_value
  */
-auto app::erase_inputvalue() noexcept -> void {
+auto app::erase_input_value() noexcept -> void {
     if (inputvalue.empty()) return;
     inputvalue.pop_back();
 }
 
 /**
- * @copydoc app::add_inputvalue
- * @internal ..
+ * @copydoc app::add_input_value
  */
-auto app::add_inputvalue(unsigned char key) noexcept -> void {
+auto app::add_input_value(unsigned char key) noexcept -> void {
     if (not (std::isdigit(key) or key == '.')) return;
     inputvalue += key;
 }
 
 /**
  * @copydoc app::mousePressed
- * @internal ..
  */
 auto app::mousePressed(int x, int y, int button) -> void {
     switch (button) {
-    case 0:
-        switch (state) {
-        case appState::calibration: {
-            calibrationPoints[pointsCalibrated] = {float(x), float(y)};
-            pointsCalibrated++;
-            ofPolyline line;
-            line.addVertex(ofPoint{640 / 2.f, 480 / 2.f});
-            line.addVertex(ofPoint{float(x), float(y)});
-            debugLines.push_back(line);
-            debugLineColors.push_back({100, 0, 0});
-            if (pointsCalibrated >= 3) {
-                finishCalibration();
-            }
-            break;
-        }
-        case appState::running: {
-            setSetPoint(x, y);
-            break;
-        }
-        }
-        break;
+    case 0:  return handle_mouse_event(x, y);
+    default: return;
     }
 }
 
 /**
- * @brief ..
- * @details ..
+ * @copydoc app::handle_mouse_event
+ */
+auto app::handle_mouse_event(int x, int y) -> void {
+    switch (appmode) {
+    case appstate::running:     return setSetPoint(x, y);
+    case appstate::calibration: return calibrate(x ,y);
+    default:                    return;
+    }
+}
+
+/**
+ * @copydoc app::calibrate
+ */
+auto app::calibrate(int x, int y) -> void {
+    calibrationPoints[pointsCalibrated] = {float(x), float(y)};
+    pointsCalibrated++;
+    ofPolyline line;
+    line.addVertex(ofPoint{640 / 2.f, 480 / 2.f});
+    line.addVertex(ofPoint{float(x), float(y)});
+    debugLines.push_back(line);
+    debugLineColors.push_back({100, 0, 0});
+    if (pointsCalibrated >= 3) {
+        finishCalibration();
+    }
+}
+
+/**
+ * @brief Event-based mechanics of this application that are yet to be implemented.
  * @{
  */
 auto app::keyReleased(int key) -> void {}

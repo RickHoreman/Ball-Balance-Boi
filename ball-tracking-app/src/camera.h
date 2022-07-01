@@ -6,8 +6,7 @@
  * @author     Rick Horeman
  * @copyright  GPL-3.0 license
  *
- * @brief ..
- * @details ..
+ * @brief Interface for the PS3 Eye camera.
  */
 
 #ifndef CAM_CAMERA_H
@@ -21,97 +20,90 @@
 
 /**
  * @namespace cam
- * @brief ..
+ * @brief Camera related components.
  */
 namespace cam {
 
 /**
  * @typedef ps3cam
- * @brief ..
+ * @brief PS3 Eye camera object type.
  */
 using ps3cam = ps3eye::PS3EYECam;
 
 /**
  * @typedef devptr
- * @brief ..
+ * @brief PS3 Eye camera object pointer type.
  */
 using devptr = ps3cam::PS3EYERef;
 
 /**
  * @typedef devlist
- * @brief ..
+ * @brief Container type for PS3 Eye camera objects.
  */
 using devlist = std::remove_reference_t<
     decltype(ps3cam::getDevices())>;
 
 /**
  * @typedef format
- * @brief ..
+ * @brief Image format type for the PS3 Eye camera.
  */
 using format = ps3cam::EOutputFormat;
 
 /**
- * @struct ..
- * @brief ..
- * @details ..
+ * @struct camera_error
+ * @brief Exception related to camera connections.
  */
 struct camera_error : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
 /**
- * @class framestats
- * @brief ..
- * @details ..
+ * @class frame_info
+ * @brief Provides information about the frames of the PS3 Eye camera.
  */
-class framestats {
+class frame_info {
 public:
     /**
-     * @brief ..
-     * @details ..
+     * @brief Updates the frame rate counter.
+     * @details This function should be called for each new camera frame.
      */
     auto update() -> void;
 
     /**
-     * @brief ..
-     * @details ..
-     * @return ..
+     * @brief Returns the frame rate of the camera.
      */
     [[nodiscard]]
     constexpr auto fps() const noexcept -> float
     { return fps_; }
 
     /**
-     * @brief ..
+     * @brief Compares two objects for equality.
      */
     [[nodiscard]]
-    friend auto operator==(framestats const&, framestats const&) -> bool = default;
+    friend auto operator==(frame_info const&, frame_info const&) -> bool = default;
 
 private:
-    uint64 sampletime{};   /**< .. */
-    uint16 samplecount{};  /**< .. */
-    uint16 count{};        /**< .. */
-    float fps_{};          /**< .. */
+    uint64 sampletime{}; /**< Timestamp since the last calculated frame rate. */
+    uint16 count{};      /**< Number of frames since the last update. */
+    float fps_{};        /**< Frames per second. */
 };
 
 /**
- * @brief ..
- * @details ..
- * @param[in] device_id ..
- * @return ..
+ * @brief Gets a PS3 Eye camera with the given device ID.
+ * @param[in] device_id Device ID of the camera to retrieve. Defaulted to 0.
+ * @exception camera_error Throws an exception when the camera could not be found.
+ * @return Pointer to the camera object.
  */
 [[nodiscard]]
-auto getdevice(devlist::size_type device_id = 0) -> devptr;
+auto get_device(devlist::size_type device_id = 0) -> devptr;
 
 /**
- * @brief ..
- * @details ..
- * @tparam ..
- * @param[in] camera ..
- * @param[in] camcfg ..
- * @return ..
+ * @brief Starts the given PS3 Eye camera with a camera configuration.
+ * @param[in] camera Camera object to initialize and start.
+ * @param[in] camcfg Contains the configuration of the camera.
+ * @exception camera_error Throws an exception when the camera could not be initialized.
  */
-auto initcamera(ps3cam& camera, auto const& camcfg) -> void {
+auto start_camera(ps3cam& camera, auto const& camcfg) -> void {
     auto const is_initialized = camera.init(
         camcfg.frame.width,
         camcfg.frame.height,
